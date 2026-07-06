@@ -131,10 +131,11 @@ body {
 }
 
 /* ---------- Board grid: label rail + 7 day columns ---------- */
-.board { flex: 1; min-height: 0; }
+/* Fills the viewport when content fits; scrolls when it doesn't. */
+.board { flex: 1; min-height: 0; overflow-y: auto; }
 
 .grid {
-  height: 100%;
+  min-height: 100%;
   display: grid;
   grid-template-columns: 96px repeat(7, 1fr);
   /* header, 4 people, dinner, activities; chores fills the rest; notes at bottom */
