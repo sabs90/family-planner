@@ -1,0 +1,12 @@
+services:
+  family-planner:
+    build: .
+    container_name: family-planner
+    ports:
+      - "3210:3000"
+    volumes:
+      # Dynamic state (meals, tasks, notes) survives container rebuilds.
+      - ./data:/app/server/data
+    environment:
+      - TZ=Australia/Sydney
+    restart: always

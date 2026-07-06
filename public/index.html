@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Family Planner</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-title">
+      <h1>The Week</h1>
+      <span id="week-range" class="week-range"></span>
+    </div>
+    <div class="topbar-clock">
+      <div id="clock" class="clock"></div>
+      <div id="today-label" class="today-label"></div>
+    </div>
+  </header>
+
+  <div class="notes-strip" id="notes-strip" title="Tap to edit notes">
+    <span class="notes-icon">📌</span>
+    <span id="notes-text" class="notes-text"></span>
+  </div>
+
+  <main id="board" class="board" aria-label="Weekly board"></main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

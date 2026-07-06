@@ -1,0 +1,4 @@
+node_modules/
+server/data/state.json
+data/
+.DS_Store

@@ -1,0 +1,13 @@
+{
+  "name": "family-planner",
+  "version": "1.0.0",
+  "description": "Family weekly ops board — wall display served from the Synology NAS",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
