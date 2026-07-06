@@ -12,7 +12,7 @@ const WEATHER_TTL = 60 * 60 * 1000; // refetch hourly
 
 // ---------- state ----------
 let weekStart = null;       // 'YYYY-MM-DD' of this week's Sunday
-let week = { meals: {}, tasks: {}, notes: '' };  // dynamic state from server
+let week = { meals: {}, tasks: {}, notes: '', dayNotes: {} };  // dynamic state from server
 let weather = {};           // dateIso → { icon, min, max }
 let weatherFetched = 0;
 let editing = false;        // true while an inline editor is open → pause re-render
@@ -35,16 +35,33 @@ function dateOfDay(i) {
 }
 
 // ---------- theme ----------
+// Mode: 'auto' (light by day, dark by night) | 'light' | 'dark'.
+// Priority: ?theme= URL override > saved mode > auto.
+const THEME_MODES = ['auto', 'light', 'dark'];
+const THEME_LABELS = { auto: '🌗 Auto', light: '☀️ Light', dark: '🌙 Dark' };
+
+function themeMode() {
+  const saved = localStorage.getItem('themeMode');
+  return THEME_MODES.includes(saved) ? saved : 'auto';
+}
+
 function applyTheme() {
   const override = new URLSearchParams(location.search).get('theme');
-  let theme;
-  if (override === 'light' || override === 'dark') {
-    theme = override;
-  } else {
+  const mode = THEME_MODES.includes(override) ? override : themeMode();
+  let theme = mode;
+  if (mode === 'auto') {
     const h = new Date().getHours();
     theme = h >= LIGHT_FROM && h < DARK_FROM ? 'light' : 'dark';
   }
   document.documentElement.dataset.theme = theme;
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = THEME_LABELS[themeMode()];
+}
+
+function cycleTheme() {
+  const next = THEME_MODES[(THEME_MODES.indexOf(themeMode()) + 1) % THEME_MODES.length];
+  localStorage.setItem('themeMode', next);
+  applyTheme();
 }
 
 // ---------- server ----------
@@ -81,7 +98,7 @@ async function fetchWeather() {
   try {
     const url = `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}` +
-      `&daily=weather_code,temperature_2m_max,temperature_2m_min` +
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,relative_humidity_2m_mean` +
       `&timezone=Australia%2FSydney&start_date=${weekStart}&end_date=${iso(dateOfDay(6))}`;
     const res = await fetch(url);
     if (!res.ok) return;
@@ -92,6 +109,8 @@ async function fetchWeather() {
         icon: weatherIcon(daily.weather_code[i]),
         min: Math.round(daily.temperature_2m_min[i]),
         max: Math.round(daily.temperature_2m_max[i]),
+        rain: daily.precipitation_sum[i],
+        hum: Math.round(daily.relative_humidity_2m_mean[i]),
       };
     });
     weatherFetched = Date.now();
@@ -302,6 +321,42 @@ function tasksContent(day) {
   });
 }
 
+function dayNoteContent(day) {
+  const note = (week.dayNotes || {})[day.key] || '';
+  const row = el('div', `day-note${note ? '' : ' empty'}`, note || '+ note');
+  row.addEventListener('click', () => openDayNoteEditor(row, day));
+  return [row];
+}
+
+function openDayNoteEditor(row, day) {
+  if (editing) return;
+  editing = true;
+  const ta = document.createElement('textarea');
+  ta.className = 'day-note-input';
+  ta.rows = 2;
+  ta.value = (week.dayNotes || {})[day.key] || '';
+  row.replaceWith(ta);
+  ta.focus();
+
+  let closed = false;
+  const close = (save) => {
+    if (closed) return;
+    closed = true;
+    editing = false;
+    if (save) {
+      const value = ta.value.trim();
+      (week.dayNotes ??= {})[day.key] = value;
+      patchWeek({ dayNotes: { [day.key]: value } });
+    }
+    renderBoard();
+  };
+  ta.addEventListener('blur', () => close(true));
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ta.blur(); }
+    if (e.key === 'Escape') close(false);
+  });
+}
+
 function weatherLine(dayIso) {
   const w = weather[dayIso];
   if (!w) return null;
@@ -310,6 +365,11 @@ function weatherLine(dayIso) {
     el('span', 'wx-icon', w.icon),
     el('span', 'wx-temp', `${w.min}°–${w.max}°`),
   );
+  if (w.rain != null) {
+    const mm = w.rain < 1 && w.rain > 0 ? w.rain.toFixed(1) : Math.round(w.rain);
+    line.append(el('span', 'wx-rain', `☔ ${mm}mm`));
+  }
+  if (w.hum != null) line.append(el('span', 'wx-hum', `💧 ${w.hum}%`));
   return line;
 }
 
@@ -321,6 +381,7 @@ const ROWS = [
   { type: 'group', label: 'Dinner',     build: mealContent },
   { type: 'group', label: 'Activities', build: eventsContent },
   { type: 'group', label: 'Chores',     build: tasksContent, cls: 'chores' },
+  { type: 'group', label: 'Notes',      build: dayNoteContent },
 ];
 
 function dayClass(dayIso, todayIso) {
@@ -421,8 +482,8 @@ function renderStacked(board) {
 async function refresh() {
   const ws = currentWeekStart();
   if (ws !== weekStart) {
-    week = { meals: {}, tasks: {}, notes: '' }; // week rolled over
-    weatherFetched = 0;                          // refetch for the new range
+    week = { meals: {}, tasks: {}, notes: '', dayNotes: {} }; // week rolled over
+    weatherFetched = 0;                                        // refetch for the new range
   }
   weekStart = ws;
   await Promise.all([fetchWeek(), fetchWeather()]);
@@ -442,6 +503,7 @@ function tick() {
 applyTheme();
 weekStart = currentWeekStart();
 document.getElementById('notes-strip').addEventListener('click', openNotesEditor);
+document.getElementById('theme-btn').addEventListener('click', cycleTheme);
 narrowMq.addEventListener('change', renderBoard);
 refresh();
 setInterval(refresh, POLL_MS);

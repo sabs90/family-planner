@@ -54,7 +54,10 @@ family-planner/
         "sunday::meal-prep": true,
         "sunday::iron-shirts": false
       },
-      "notes": ""
+      "notes": "",                      // week-level notes strip
+      "dayNotes": {                     // per-day one-off notes
+        "thursday": "Illy photo day"
+      }
     }
   }
 }

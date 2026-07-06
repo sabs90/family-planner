@@ -88,6 +88,20 @@ body {
 
 .today-label { font-size: 1.05rem; color: var(--text-2); font-weight: 500; }
 
+.theme-btn {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 4px 12px;
+  cursor: pointer;
+  align-self: center;
+}
+.theme-btn:hover { color: var(--text); }
+
 /* ---------- Notes strip ---------- */
 .notes-strip {
   display: flex;
@@ -123,8 +137,8 @@ body {
   height: 100%;
   display: grid;
   grid-template-columns: 96px repeat(7, 1fr);
-  /* header, 4 people, dinner, activities; chores fills the rest */
-  grid-template-rows: auto auto auto auto auto auto auto 1fr;
+  /* header, 4 people, dinner, activities; chores fills the rest; notes at bottom */
+  grid-template-rows: auto auto auto auto auto auto auto 1fr auto;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -190,12 +204,15 @@ body {
 .wx {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.8rem;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
+
+.wx-rain, .wx-hum { font-size: 0.73rem; font-weight: 500; }
 
 /* Label rail */
 .cell.label { background: var(--surface-2); }
@@ -393,6 +410,30 @@ body {
   color: var(--pc, var(--text-3));
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+/* Per-day notes */
+.day-note {
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  min-height: 20px;
+  overflow-wrap: anywhere;
+}
+.day-note.empty { color: var(--text-3); font-style: italic; }
+
+.day-note-input {
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  width: 100%;
+  resize: none;
+  outline: none;
 }
 
 /* ---------- Phone / narrow: stacked day cards ---------- */

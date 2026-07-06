@@ -62,3 +62,11 @@ Newest at bottom. Append with today's date when decisions are made or changed.
 - **Chores expanded**: Sun + groceries; Thu bins, fridge; Fri laundry, tidy, toilets,
   vacuum, meal plan; Sat laundry, study. Sat also gets "Family fun adventure day" 🎉.
 - Lane renamed Evening → **Activities** (now holds daytime events too).
+
+## 2026-07-07 — Design review round 2
+- **Theme switch button** in header cycling 🌗 Auto → ☀️ Light → 🌙 Dark, saved in
+  localStorage; `?theme=` URL param still wins (for pinning the kiosk tablet).
+- **Weather extended**: ☔ rain sum (mm) + 💧 mean humidity (%) per day, same Open-Meteo call.
+- **Per-day notes row** at the bottom of the grid — tap a day's cell to add one-off info
+  ("photo day", etc). Stored per week as `dayNotes.<day>`; server deep-merges and upgrades
+  pre-existing week records that lack the field. Weekly notes strip unchanged.

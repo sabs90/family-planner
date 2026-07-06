@@ -28,7 +28,7 @@ const state = load();
 function defaultWeek() {
   // Meals/tasks default empty; the frontend template supplies fixed defaults
   // (e.g. Wednesday's grandparents dinner) so nothing is duplicated here.
-  return { meals: {}, tasks: {}, notes: '' };
+  return { meals: {}, tasks: {}, notes: '', dayNotes: {} };
 }
 
 export function getWeek(weekStart) {
@@ -54,6 +54,12 @@ export function patchWeek(weekStart, patch) {
   }
   if (typeof patch.notes === 'string') {
     week.notes = patch.notes;
+  }
+  if (patch.dayNotes && typeof patch.dayNotes === 'object') {
+    week.dayNotes ??= {}; // records created before dayNotes existed
+    for (const [day, note] of Object.entries(patch.dayNotes)) {
+      week.dayNotes[day] = String(note);
+    }
   }
 
   state.weeks[weekStart] = week;
