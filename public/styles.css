@@ -8,6 +8,10 @@
   --c-illy:   #14b8a6;
   --c-ismail: #f59e0b;
 
+  /* Location colors — daycare vs grandparents' (Mascot) at a glance */
+  --c-daycare: #e11d48;
+  --c-mascot:  #16a34a;
+
   --bg: #f4f2ee;
   --surface: #ffffff;
   --surface-2: #f8f7f4;
@@ -16,7 +20,6 @@
   --text-2: #5c6370;
   --text-3: #9aa0ab;
   --accent: #e1683c;           /* today highlight — warm terracotta */
-  --accent-soft: #fdf0ea;
   --shadow: 0 1px 3px rgba(30, 30, 40, 0.06), 0 4px 16px rgba(30, 30, 40, 0.05);
 }
 
@@ -26,6 +29,9 @@ html[data-theme="dark"] {
   --c-illy:   #2dd4bf;
   --c-ismail: #fbbf24;
 
+  --c-daycare: #fb7185;
+  --c-mascot:  #4ade80;
+
   --bg: #14161c;
   --surface: #1d2027;
   --surface-2: #23262f;
@@ -34,7 +40,6 @@ html[data-theme="dark"] {
   --text-2: #a4a9b4;
   --text-3: #6b707c;
   --accent: #ff8c5f;
-  --accent-soft: #33251f;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
@@ -111,58 +116,67 @@ body {
   resize: none;
 }
 
-/* ---------- Board ---------- */
-.board {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 10px;
-  min-height: 0;
-}
+/* ---------- Board grid: label rail + 7 day columns ---------- */
+.board { flex: 1; min-height: 0; }
 
-.day-col {
+.grid {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 96px repeat(7, 1fr);
+  /* header, 4 people, dinner, activities; chores fills the rest */
+  grid-template-rows: auto auto auto auto auto auto auto 1fr;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.cell {
+  min-width: 0;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  min-width: 0;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 4px;
 }
 
-.day-col.past { opacity: 0.55; }
+.cell.first { border-left: none; }
+.cell.head { border-top: none; }
+.cell.chores { justify-content: flex-start; }
 
-.day-col.today {
-  border: 2px solid var(--accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent), var(--shadow);
-}
+/* Today column: tinted top-to-bottom, strong header */
+.cell.today { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.cell.head.today { background: var(--accent); }
+.cell.head.today .day-name,
+.cell.head.today .day-date { color: #fff; }
+.cell.head.today .wx { color: rgba(255, 255, 255, 0.9); }
 
-/* Day header */
-.day-head {
+.cell.past { opacity: 0.5; }
+
+/* Day header cells */
+.day-name {
+  font-size: 1.02rem;
+  font-weight: 700;
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  padding: 10px 12px 8px;
+  gap: 7px;
+  width: 100%;
 }
 
-.day-name { font-size: 1.05rem; font-weight: 700; }
-
 .day-date {
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   color: var(--text-3);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  margin-left: auto;
 }
-
-.day-col.today .day-head {
-  background: var(--accent);
-}
-.day-col.today .day-name,
-.day-col.today .day-date { color: #fff; }
 
 .today-badge {
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -170,34 +184,44 @@ body {
   color: #fff;
   border-radius: 99px;
   padding: 2px 7px;
-  margin-left: 6px;
-  vertical-align: 2px;
 }
 
-/* Lanes */
-.lane {
-  padding: 8px 10px;
-  border-top: 1px solid var(--border);
+/* Weather line in day header */
+.wx {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
 }
 
-.lane-title {
-  font-size: 0.6rem;
+/* Label rail */
+.cell.label { background: var(--surface-2); }
+
+.label-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.label-role {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-3);
+  padding-left: 17px;
+}
+
+.cell.label.group {
+  font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-3);
-}
-
-/* Person rows */
-.person-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 24px;
-  flex-wrap: wrap;
 }
 
 .dot {
@@ -208,29 +232,30 @@ body {
   background: var(--pc);
 }
 
-.person-name {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--text);
-  width: 3.1em;
-  flex: none;
-}
-
+/* ---------- Chips ---------- */
 .loc {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 600;
   color: var(--text-2);
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 2px 7px;
+  padding: 2px 8px;
   white-space: nowrap;
 }
 
 .loc .sub { font-weight: 500; color: var(--text-3); font-size: 0.75rem; }
+
+/* Colored locations (daycare / Mascot) */
+.loc.tinted {
+  color: var(--lc);
+  background: color-mix(in srgb, var(--lc) 11%, transparent);
+  border-color: color-mix(in srgb, var(--lc) 32%, transparent);
+  font-weight: 700;
+}
 
 .none { color: var(--text-3); font-size: 0.85rem; }
 
@@ -239,7 +264,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 700;
   color: var(--pc);
   background: color-mix(in srgb, var(--pc) 14%, transparent);
@@ -257,23 +282,18 @@ body {
   background: var(--pc);
 }
 
-/* Kid rows: name+location line, then D/P chip line */
-.kid-row { display: flex; flex-direction: column; gap: 3px; }
-.kid-row .dp-line { padding-left: 17px; }
-
-/* Dinner lane */
-.meal-lane { gap: 4px; }
-
+/* Dinner */
 .meal-row {
   display: flex;
   align-items: center;
   gap: 7px;
-  min-height: 26px;
+  min-height: 24px;
   cursor: pointer;
   border-radius: 8px;
+  max-width: 100%;
 }
 
-.meal-dish { font-size: 0.88rem; font-weight: 600; flex: 1; }
+.meal-dish { font-size: 0.88rem; font-weight: 600; }
 .meal-dish.empty { color: var(--text-3); font-weight: 500; font-style: italic; }
 .meal-fixed { cursor: default; }
 
@@ -293,7 +313,7 @@ body {
   background: var(--pc);
 }
 
-.meal-editor { display: flex; flex-direction: column; gap: 6px; }
+.meal-editor { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .meal-editor input, .meal-editor select {
   font: inherit;
   font-size: 0.85rem;
@@ -318,7 +338,7 @@ body {
 }
 .meal-editor button.save { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-/* Evening chips */
+/* Activities chips */
 .evening-chip {
   display: inline-flex;
   align-items: center;
@@ -327,32 +347,33 @@ body {
   font-weight: 700;
   border-radius: 99px;
   padding: 3px 10px;
-  width: fit-content;
+  max-width: 100%;
   color: var(--pc, var(--text-2));
   background: color-mix(in srgb, var(--pc, var(--text-3)) 13%, transparent);
   border: 1px solid color-mix(in srgb, var(--pc, var(--text-3)) 32%, transparent);
 }
 
-/* Tasks lane */
+/* Chores */
 .task-row {
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
   user-select: none;
-  min-height: 26px;
+  min-height: 24px;
+  width: 100%;
 }
 
 .task-check {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   flex: none;
   border-radius: 6px;
   border: 2px solid var(--text-3);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
   color: transparent;
   transition: all 0.15s ease;
 }
@@ -367,20 +388,59 @@ body {
 .task-row.done .task-label { text-decoration: line-through; color: var(--text-3); font-weight: 500; }
 
 .task-meta {
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 700;
   color: var(--pc, var(--text-3));
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.spacer { flex: 1; }
+/* ---------- Phone / narrow: stacked day cards ---------- */
+.day-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
 
-/* ---------- Phone / narrow: stack days vertically ---------- */
+.day-card.today { border: 2px solid var(--accent); }
+
+.day-card .day-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.day-card .day-head .day-date { margin-left: auto; }
+
+.day-card.today .day-head { background: var(--accent); }
+.day-card.today .day-head .day-name,
+.day-card.today .day-head .day-date { color: #fff; }
+.day-card.today .day-head .wx { color: rgba(255, 255, 255, 0.9); }
+
+.day-card .lane {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: flex-start;
+}
+
+.lane-title {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
 @media (max-width: 900px) {
   body { padding: 10px; }
-  .board { display: flex; flex-direction: column; }
-  .day-col.past { display: none; }   /* phone: hide past days, focus on now */
+  .board { overflow-y: auto; }
   .topbar h1 { font-size: 1.25rem; }
   .clock { font-size: 1.25rem; }
 }

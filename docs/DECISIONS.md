@@ -50,3 +50,15 @@ Newest at bottom. Append with today's date when decisions are made or changed.
 - Task ids `${day}::${slug}`; kid logistics use `dp` (one parent both ways) with `drop`/`pick`
   split supported by the renderer for future use.
 - Icons: consistent emoji set (not SVG) — simplest, renders well on tablets.
+
+## 2026-07-07 — Design review round 1 (after seeing it live)
+- **Label rail layout**: board restructured from 7 self-contained day cards to one grid
+  with a left label column (Sab / Raya / Illy / Ismail / Dinner / Activities / Chores) —
+  names no longer repeat in every day column. Phone keeps stacked day cards (names inline).
+- **"Grandparents' Mascot" → "Mascot"**; daycare (rose) vs Mascot (green) get distinct
+  tinted chip colors so care location reads at a glance.
+- **Weather** added per day header: emoji + min–max °C from **Open-Meteo** (free, no key),
+  Mascot coords, fetched client-side, cached 1h, silent on failure.
+- **Chores expanded**: Sun + groceries; Thu bins, fridge; Fri laundry, tidy, toilets,
+  vacuum, meal plan; Sat laundry, study. Sat also gets "Family fun adventure day" 🎉.
+- Lane renamed Evening → **Activities** (now holds daytime events too).

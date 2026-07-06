@@ -5,10 +5,19 @@ const TICK_MS = 30_000;   // clock / today / theme recompute
 const LIGHT_FROM = 7;     // auto theme: light 07:00–18:59
 const DARK_FROM = 19;
 
+// Open-Meteo daily forecast — Mascot/Sydney, free, no API key.
+const WEATHER_LAT = -33.92;
+const WEATHER_LON = 151.19;
+const WEATHER_TTL = 60 * 60 * 1000; // refetch hourly
+
 // ---------- state ----------
 let weekStart = null;       // 'YYYY-MM-DD' of this week's Sunday
 let week = { meals: {}, tasks: {}, notes: '' };  // dynamic state from server
+let weather = {};           // dateIso → { icon, min, max }
+let weatherFetched = 0;
 let editing = false;        // true while an inline editor is open → pause re-render
+
+const narrowMq = window.matchMedia('(max-width: 900px)');
 
 // ---------- date helpers (all local / Sydney time) ----------
 const pad = (n) => String(n).padStart(2, '0');
@@ -53,6 +62,42 @@ function patchWeek(patch) {
   }).catch(() => {});
 }
 
+// ---------- weather ----------
+function weatherIcon(code) {
+  if (code === 0) return '☀️';
+  if (code <= 2) return '🌤️';
+  if (code === 3) return '☁️';
+  if (code <= 48) return '🌫️';
+  if (code <= 57) return '🌦️';
+  if (code <= 67) return '🌧️';
+  if (code <= 77) return '🌨️';
+  if (code <= 82) return '🌧️';
+  if (code <= 86) return '🌨️';
+  return '⛈️';
+}
+
+async function fetchWeather() {
+  if (Date.now() - weatherFetched < WEATHER_TTL) return;
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast` +
+      `?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}` +
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min` +
+      `&timezone=Australia%2FSydney&start_date=${weekStart}&end_date=${iso(dateOfDay(6))}`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const { daily } = await res.json();
+    weather = {};
+    daily.time.forEach((d, i) => {
+      weather[d] = {
+        icon: weatherIcon(daily.weather_code[i]),
+        min: Math.round(daily.temperature_2m_min[i]),
+        max: Math.round(daily.temperature_2m_max[i]),
+      };
+    });
+    weatherFetched = Date.now();
+  } catch { /* offline / API down → just no weather line */ }
+}
+
 // ---------- DOM helpers ----------
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -95,7 +140,6 @@ function renderNotes() {
 function openNotesEditor() {
   if (editing) return;
   editing = true;
-  const strip = document.getElementById('notes-strip');
   const textEl = document.getElementById('notes-text');
   const ta = document.createElement('textarea');
   ta.rows = 1;
@@ -124,111 +168,53 @@ function openNotesEditor() {
   });
 }
 
-// ---------- render: board ----------
-function renderBoard() {
-  if (editing) return; // don't clobber an open editor on poll
-  const board = document.getElementById('board');
-  board.textContent = '';
-  const todayIso = iso(new Date());
-
-  WEEK.forEach((day, i) => {
-    const date = dateOfDay(i);
-    const dayIso = iso(date);
-    const col = el('section', 'day-col');
-    if (dayIso === todayIso) col.classList.add('today');
-    else if (dayIso < todayIso) col.classList.add('past');
-
-    // Day header
-    const head = el('div', 'day-head');
-    const name = el('span', 'day-name', day.label);
-    if (dayIso === todayIso) name.append(el('span', 'today-badge', 'Today'));
-    head.append(name, el('span', 'day-date', String(date.getDate())));
-    col.append(head);
-
-    col.append(renderParentsLane(day));
-    col.append(renderKidsLane(day));
-    col.append(renderMealLane(day));
-    if (day.evening.length) col.append(renderEveningLane(day));
-    if (day.tasks.length) col.append(renderTasksLane(day));
-
-    board.append(col);
-  });
-}
-
+// ---------- cell content builders (shared by grid + stacked layouts) ----------
 function locChip(entry) {
+  const chip = el('span', 'loc');
   if (entry.activity) {
-    const chip = el('span', 'loc');
-    chip.append(
-      el('span', null, entry.icon || '•'),
-      el('span', null, entry.activity),
-    );
+    chip.append(el('span', null, entry.icon || '•'), el('span', null, entry.activity));
     if (entry.time) chip.append(el('span', 'sub', entry.time));
     return chip;
   }
   const loc = LOCATIONS[entry.loc];
-  const chip = el('span', 'loc');
   chip.append(el('span', null, loc.icon), el('span', null, loc.label));
-  if (loc.sub) chip.append(el('span', 'sub', loc.sub));
+  if (loc.c) {
+    chip.classList.add('tinted');
+    chip.style.setProperty('--lc', `var(--c-${loc.c})`);
+  }
   return chip;
 }
 
-function renderParentsLane(day) {
-  const lane = el('div', 'lane');
-  lane.append(el('div', 'lane-title', 'Parents'));
-  for (const id of PARENTS) {
-    const row = personColor(el('div', 'person-row'), id);
-    row.append(el('span', 'dot'), el('span', 'person-name', FAMILY[id].short));
-    const entry = day.parents[id];
-    row.append(entry ? locChip(entry) : el('span', 'none', '—'));
-    lane.append(row);
-  }
-  return lane;
+function parentContent(day, id) {
+  const entry = day.parents[id];
+  return [entry ? locChip(entry) : el('span', 'none', '—')];
 }
 
-function renderKidsLane(day) {
-  const lane = el('div', 'lane');
-  lane.append(el('div', 'lane-title', 'Kids'));
-  for (const id of KIDS) {
-    const entry = day.kids[id];
-    const wrap = el('div', 'kid-row');
-    const row = personColor(el('div', 'person-row'), id);
-    row.append(el('span', 'dot'), el('span', 'person-name', FAMILY[id].short));
-    row.append(entry ? locChip(entry) : el('span', 'none', '—'));
-    wrap.append(row);
-
-    // D/P ownership — the most important info on the board
-    if (entry) {
-      const dpLine = el('div', 'dp-line');
-      if (entry.dp) {
-        const chip = personColor(el('span', 'dp-chip'), entry.dp);
-        chip.append(el('span', null, `${FAMILY[entry.dp].short} · drop + pick`));
-        dpLine.append(chip);
-      } else if (entry.drop || entry.pick) {
-        for (const [verb, pid] of [['drop', entry.drop], ['pick', entry.pick]]) {
-          if (!pid) continue;
-          const chip = personColor(el('span', 'dp-chip'), pid);
-          chip.append(el('span', null, `${FAMILY[pid].short} · ${verb}`));
-          dpLine.append(chip, document.createTextNode(' '));
-        }
-      }
-      if (dpLine.childNodes.length) wrap.append(dpLine);
+function kidContent(day, id) {
+  const entry = day.kids[id];
+  if (!entry) return [el('span', 'none', '—')];
+  const nodes = [locChip(entry)];
+  if (entry.dp) {
+    const chip = personColor(el('span', 'dp-chip'), entry.dp);
+    chip.append(el('span', null, `${FAMILY[entry.dp].short} · drop + pick`));
+    nodes.push(chip);
+  } else if (entry.drop || entry.pick) {
+    for (const [verb, pid] of [['drop', entry.drop], ['pick', entry.pick]]) {
+      if (!pid) continue;
+      const chip = personColor(el('span', 'dp-chip'), pid);
+      chip.append(el('span', null, `${FAMILY[pid].short} · ${verb}`));
+      nodes.push(chip);
     }
-    lane.append(wrap);
   }
-  return lane;
+  return nodes;
 }
 
-function renderMealLane(day) {
-  const lane = el('div', 'lane meal-lane');
-  lane.append(el('div', 'lane-title', 'Dinner'));
-
+function mealContent(day) {
   if (day.mealFixed) {
     const row = el('div', 'meal-row meal-fixed');
     row.append(el('span', null, '🍽️'), el('span', 'meal-dish', day.mealFixed.dish));
-    lane.append(row);
-    return lane;
+    return [row];
   }
-
   const meal = week.meals[day.key] || {};
   const row = el('div', 'meal-row');
   row.append(el('span', null, '🍽️'));
@@ -242,12 +228,11 @@ function renderMealLane(day) {
   } else {
     row.append(el('span', 'meal-dish empty', 'add dinner'));
   }
-  row.addEventListener('click', () => openMealEditor(lane, row, day));
-  lane.append(row);
-  return lane;
+  row.addEventListener('click', () => openMealEditor(row, day));
+  return [row];
 }
 
-function openMealEditor(lane, row, day) {
+function openMealEditor(row, day) {
   if (editing) return;
   editing = true;
   const meal = week.meals[day.key] || {};
@@ -288,22 +273,18 @@ function openMealEditor(lane, row, day) {
   });
 }
 
-function renderEveningLane(day) {
-  const lane = el('div', 'lane');
-  lane.append(el('div', 'lane-title', 'Evening'));
-  for (const ev of day.evening) {
+function eventsContent(day) {
+  return day.events.map((ev) => {
     const chip = personColor(el('span', 'evening-chip'), ev.personId);
     if (ev.icon) chip.append(el('span', null, ev.icon));
-    chip.append(el('span', null, ev.personId ? `${FAMILY[ev.personId].short} · ${ev.label}` : ev.label));
-    lane.append(chip);
-  }
-  return lane;
+    chip.append(el('span', null,
+      ev.personId ? `${FAMILY[ev.personId].short} · ${ev.label}` : ev.label));
+    return chip;
+  });
 }
 
-function renderTasksLane(day) {
-  const lane = el('div', 'lane');
-  lane.append(el('div', 'lane-title', 'Prep'));
-  for (const task of day.tasks) {
+function tasksContent(day) {
+  return day.tasks.map((task) => {
     const id = `${day.key}::${task.slug}`;
     const done = Boolean(week.tasks[id]);
     const row = el('div', `task-row${done ? ' done' : ''}`);
@@ -317,17 +298,134 @@ function renderTasksLane(day) {
       patchWeek({ tasks: { [id]: next } });
       renderBoard();
     });
-    lane.append(row);
+    return row;
+  });
+}
+
+function weatherLine(dayIso) {
+  const w = weather[dayIso];
+  if (!w) return null;
+  const line = el('div', 'wx');
+  line.append(
+    el('span', 'wx-icon', w.icon),
+    el('span', 'wx-temp', `${w.min}°–${w.max}°`),
+  );
+  return line;
+}
+
+// ---------- render: board ----------
+// Row definitions: label rail + one cell builder per day.
+const ROWS = [
+  ...PARENTS.map((id) => ({ type: 'person', id, build: (d) => parentContent(d, id) })),
+  ...KIDS.map((id) => ({ type: 'person', id, build: (d) => kidContent(d, id) })),
+  { type: 'group', label: 'Dinner',     build: mealContent },
+  { type: 'group', label: 'Activities', build: eventsContent },
+  { type: 'group', label: 'Chores',     build: tasksContent, cls: 'chores' },
+];
+
+function dayClass(dayIso, todayIso) {
+  if (dayIso === todayIso) return ' today';
+  if (dayIso < todayIso) return ' past';
+  return '';
+}
+
+function renderBoard() {
+  if (editing) return; // don't clobber an open editor on poll
+  const board = document.getElementById('board');
+  board.textContent = '';
+  if (narrowMq.matches) renderStacked(board);
+  else renderGrid(board);
+}
+
+function renderGrid(board) {
+  const todayIso = iso(new Date());
+  const grid = el('div', 'grid');
+
+  // Header row: corner + day headers with date + weather
+  grid.append(el('div', 'cell head first'));
+  WEEK.forEach((day, i) => {
+    const date = dateOfDay(i);
+    const dayIso = iso(date);
+    const cell = el('div', `cell head${dayClass(dayIso, todayIso)}`);
+    const name = el('div', 'day-name', day.label);
+    if (dayIso === todayIso) name.append(el('span', 'today-badge', 'Today'));
+    name.append(el('span', 'day-date', String(date.getDate())));
+    cell.append(name);
+    const wx = weatherLine(dayIso);
+    if (wx) cell.append(wx);
+    grid.append(cell);
+  });
+
+  for (const row of ROWS) {
+    // Label rail
+    const label = el('div', `cell first label${row.type === 'group' ? ' group' : ''}${row.cls ? ' ' + row.cls : ''}`);
+    if (row.type === 'person') {
+      personColor(label, row.id);
+      const nameRow = el('div', 'label-name');
+      nameRow.append(el('span', 'dot'), el('span', null, FAMILY[row.id].short));
+      label.append(nameRow, el('div', 'label-role', FAMILY[row.id].role));
+    } else {
+      label.append(el('span', null, row.label));
+    }
+    grid.append(label);
+
+    // Day cells
+    WEEK.forEach((day, i) => {
+      const dayIso = iso(dateOfDay(i));
+      const cell = el('div', `cell${dayClass(dayIso, todayIso)}${row.cls ? ' ' + row.cls : ''}`);
+      cell.append(...row.build(day));
+      grid.append(cell);
+    });
   }
-  return lane;
+
+  board.append(grid);
+}
+
+// Phone layout: stacked day cards (label rail doesn't fit → names shown inline).
+function renderStacked(board) {
+  const todayIso = iso(new Date());
+  WEEK.forEach((day, i) => {
+    const date = dateOfDay(i);
+    const dayIso = iso(date);
+    if (dayIso < todayIso) return; // phone: hide past days, focus on now
+
+    const card = el('section', `day-card${dayClass(dayIso, todayIso)}`);
+    const head = el('div', 'day-head');
+    const name = el('span', 'day-name', day.label);
+    if (dayIso === todayIso) name.append(el('span', 'today-badge', 'Today'));
+    head.append(name);
+    const wx = weatherLine(dayIso);
+    if (wx) head.append(wx);
+    head.append(el('span', 'day-date', String(date.getDate())));
+    card.append(head);
+
+    for (const row of ROWS) {
+      const content = row.build(day);
+      if (!content.length) continue;
+      const lane = el('div', `lane${row.cls ? ' ' + row.cls : ''}`);
+      if (row.type === 'person') {
+        const pr = personColor(el('div', 'label-name'), row.id);
+        pr.append(el('span', 'dot'), el('span', null, FAMILY[row.id].short));
+        lane.append(pr);
+      } else {
+        lane.append(el('div', 'lane-title', row.label));
+      }
+      lane.append(...content);
+      card.append(lane);
+    }
+    board.append(card);
+  });
 }
 
 // ---------- lifecycle ----------
 async function refresh() {
   const ws = currentWeekStart();
-  if (ws !== weekStart) week = { meals: {}, tasks: {}, notes: '' }; // week rolled over
+  if (ws !== weekStart) {
+    week = { meals: {}, tasks: {}, notes: '' }; // week rolled over
+    weatherFetched = 0;                          // refetch for the new range
+  }
   weekStart = ws;
-  await fetchWeek();
+  await Promise.all([fetchWeek(), fetchWeather()]);
   renderHeader();
   renderNotes();
   renderBoard();
@@ -344,6 +442,7 @@ function tick() {
 applyTheme();
 weekStart = currentWeekStart();
 document.getElementById('notes-strip').addEventListener('click', openNotesEditor);
+narrowMq.addEventListener('change', renderBoard);
 refresh();
 setInterval(refresh, POLL_MS);
 setInterval(tick, TICK_MS);

@@ -24,8 +24,8 @@ config (`public/config.js`). Update this doc first when the routine changes, the
 | `city` | City | | Sydney CBD |
 | `wfh` | WFH | | working from home |
 | `parramatta` | Parramatta | | |
-| `daycare` | Daycare | | |
-| `grandparents` | Grandparents’ | Mascot | childcare at grandparents' |
+| `daycare` | Daycare | | colored chip (rose) |
+| `grandparents` | Mascot | | childcare at grandparents' (displayed as just "Mascot"); colored chip (green) |
 | `home` | Home | | kid at home with parent(s) |
 
 ## Day by day
@@ -35,6 +35,7 @@ config (`public/config.js`). Update this doc first when the routine changes, the
 - **Raya:** prep work outfits.
 - **Shared prep tasks (checkable, reset weekly):**
   - Afternoon — **weekly meal prep**
+  - **Groceries**
   - Evening — **arrange kids' clothes for the week**
   - Evening — **pack kids' bags**
   - Sabeeh — **iron shirts**
@@ -63,18 +64,21 @@ config (`public/config.js`). Update this doc first when the routine changes, the
 - Illy: **Grandparents' (Mascot)** — Sabeeh D/P
 - Ismail: **Daycare** — Raya D/P
 - Evening: **Sabeeh — futsal**
+- Chores: **bins, fridge**
 
 ### Friday
 - Sabeeh: **WFH** · Raya: **WFH**
 - Illy: **Daycare** — Sabeeh D/P
 - Ismail: **Home** (both parents WFH)
 - Evening: —
+- Chores: **laundry, tidy, toilets, vacuum, meal plan**
 
 ### Saturday
 - No work.
 - Illy: **swimming (morning)**
 - Raya: **pilates (morning)**
-- Evening: —
+- **Family fun adventure day** 🎉
+- Chores: **laundry, study**
 
 ## Meals (dynamic, editable per week)
 Meals are **not** part of the fixed template — they're editable weekly with "who cooks"
