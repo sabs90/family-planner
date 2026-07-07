@@ -10,10 +10,16 @@ locally-hosted web page on a Synology NAS, displayed fullscreen on a wall-mounte
 landscape device, and editable from a phone.
 
 ## Status
-**Built (Phases 0–4) and verified locally, 2026-07-07.** App runs with
-`PORT=3210 npm start` → http://localhost:3210 (port 3000 is taken by Finboard on the dev
-machine). Remaining: user design review/tweaks, Docker build test, Synology deploy, tablet
-setup. See `docs/BUILD.md` Status for details.
+**v1 feature-complete, verified locally, 2026-07-07** — after 5 design-review rounds with
+the user (see `docs/DECISIONS.md`). Board + full editing story are done: label-rail grid,
+weather, per-day/weekly notes, theme switch, in-app routine editing (inline cell editors
+with this-week/every-week scope, ✏️ edit mode, ⚙️ settings page, activity catalog).
+
+Run locally: `PORT=3210 npm start` → http://localhost:3210 (port 3000 is taken by Finboard
+on the dev machine). A dev server may still be running from the last session.
+
+**Remaining (next session):** Docker build test → Synology deploy (README has the steps) →
+tablet + Fully Kiosk setup → review on real hardware. Optional: settings-page polish, SSE.
 
 ## Doc index
 - `docs/PROJECT.md` — goal, why, family context, hardware stack, success criteria.
@@ -30,11 +36,18 @@ setup. See `docs/BUILD.md` Status for details.
 - Display: wall-mounted landscape Android tablet running Fully Kiosk Browser → NAS URL.
 
 ## How to work in this repo
-- The stable weekly routine lives in frontend config (rarely edited). Dynamic state
-  (meals + cook, chore checkmarks, notes) persists via the API, **keyed by week** so
-  chores auto-reset each week. Keep this split — don't hardcode dynamic data.
+- **Three data tiers — keep the split:**
+  1. `public/config.js` — static: people, locations, colors (change = redeploy).
+  2. Routine template — server-stored (`server/data/template.json`, seeded from
+     `server/default-template.js`), edited in-app via `GET/PUT /api/template`.
+     Routine changes need **no container rebuild**.
+  3. Weekly dynamic state — `server/data/state.json` keyed by week-start (Sunday):
+     meals, chore ticks, notes, dayNotes, and this-week **overrides** (auto-expire at
+     rollover; `"__reset__"` sentinel clears one).
 - Week starts **Sunday** (Sunday prep kicks off the week). Column order is Sun→Sat.
-- Keep it vibe-code-friendly and simple: readable vanilla code, minimal deps.
+- Editors hold live references into the client's TEMPLATE — never refetch the template
+  while `editing` is true.
+- Keep it vibe-code-friendly and simple: readable vanilla code, Express is the only dep.
 
 ## ⚑ "end session" trigger
 When the user says **"end session"** (or "end the session"), treat it as a signal to

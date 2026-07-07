@@ -4,14 +4,37 @@ Execute top-down. Each phase has acceptance criteria. Check items off and update
 "end session".
 
 ## Status
-**Phases 0–4 built and verified locally (2026-07-07).** Remaining: user design review,
-Docker build test, actual Synology deploy + tablet setup. Then Phase 5 nice-to-haves.
+**Phases 0–4 built + 5 post-v1 feature rounds, all verified locally (2026-07-07).**
+Remaining: Docker build test, Synology deploy, tablet setup (see checklist below).
 
 Notes from the build:
 - Local dev runs on **port 3210** (`PORT=3210 npm start`) — port 3000 is occupied by
   another app (Finboard) on the dev machine. Docker publishes host 3210 → container 3000.
 - Verified via curl: week defaults, PATCH deep-merge, weekly reset, 400 on bad weekStart,
-  state survives server restart. `state.json` test data was cleared after verification.
+  state survives server restart; template GET/PUT/persist/validate; overrides set/reset;
+  activity catalog backfill + preservation on week-only PUTs.
+
+## Post-v1 feature rounds (all done 2026-07-07, user-driven; details in DECISIONS.md)
+- [x] Label-rail grid restructure (names once, not per column); phone keeps stacked cards.
+- [x] Weather per day (Open-Meteo): icon + min–max + rain mm (humidity added then removed).
+- [x] "Mascot" rename + daycare (rose) vs Mascot (green) tinted chips.
+- [x] Expanded chores (Thu/Fri/Sat/Sun) + Sat "Family fun adventure day".
+- [x] Theme switch button (Auto/Light/Dark, localStorage; `?theme=` still wins).
+- [x] Per-day notes row (dayNotes, tap to edit).
+- [x] Board scrolls when grid exceeds viewport.
+- [x] **Routine editable in-app**: template server-side (`template.json` + GET/PUT
+      /api/template), inline person-cell editors with This-week/Every-week scope,
+      this-week overrides ("this wk" badge, auto-expire), ⚙️ /settings.html page.
+- [x] Inline activities editor (person + catalog dropdowns, "new activity" grows catalog)
+      and chores editor (add/remove with ✕); + buttons removed → tap activities /
+      long-press chores / **✏️ Edit mode** toggle that outlines all editables.
+
+## Deploy checklist (next session)
+- [ ] `docker compose build` succeeds locally.
+- [ ] Copy to NAS, Container Manager project up, reachable at `http://<nas-ip>:3210`.
+- [ ] State + template survive container restart (bind-mounted `./data`).
+- [ ] Tablet: Fully Kiosk pointed at NAS URL, mounted, smart-plug charging.
+- [ ] Real-hardware design review (row heights at 1080p, touch targets).
 
 ## Phase 0 — Scaffold ✅
 - [x] `git init` (repo is not yet a git repo).
@@ -52,10 +75,13 @@ Notes from the build:
 - [ ] Deployed on the NAS; state survives restart; tablet shows it fullscreen.
 
 ## Phase 5 — Future / nice-to-have
+- [x] Per-week logistics **overrides** (one-off "Raya in City this Tue") — done, inline.
+- [x] Weather strip — done (Open-Meteo per-day).
 - [ ] SSE for instant cross-device updates (replace polling).
-- [ ] Per-week logistics **overrides** (one-off "Raya in City this Tue").
 - [ ] Optional Home Assistant / Google Calendar feed as a data source.
-- [ ] Weather strip, "next up" indicator, week-over-week chore completion stats.
+- [ ] "Next up" indicator, week-over-week chore completion stats.
+- [ ] Settings-page visual polish (functional but plain).
+- [ ] `?readonly=1` mode for the wall URL if stray taps become a problem.
 
 ## Build conventions
 - Keep deps minimal (Express + maybe nothing else). No build step for the frontend.

@@ -63,12 +63,24 @@ Keep one visual language; don't mix heavy emoji with line icons.
 - Large, friendly, high-legibility sans. Clear weight hierarchy: day headers bold, labels
   medium, secondary info lighter. Numbers (dates, times) tabular.
 
-## Interaction
-- **Wall display:** read-mostly, auto-refresh. Tapping a task toggles it (kiosk touch).
-- **Phone (responsive):** same app, narrower viewport → columns stack vertically. This is
-  where meals/notes get edited and tasks ticked off on the go.
-- Optimistic updates: reflect immediately, then PATCH; reconcile on next poll.
-- Empty states: unfilled meal shows a subtle "add dinner" affordance.
+## Interaction (as built, 2026-07-07)
+- **Direct taps (always on):** tap a chore → toggle; tap a dinner → meal editor (dish +
+  cook); tap a person cell → location/D-P editor with **"This week" / "Every week"** scope
+  (this-week overrides get a dashed "this wk" badge and a "↩ Routine" reset); tap an
+  activities cell → activities editor (person + catalog dropdowns, "➕ New activity…");
+  tap a Notes cell or the weekly notes strip → text editor.
+- **Long-press (~0.5s) a chores cell** → chores editor (add / ✕ remove) without leaving
+  toggle behavior on plain tap.
+- **✏️ Edit mode (header button):** outlines every editable cell with a dashed accent and
+  switches chores cells to tap-to-edit; button becomes "✓ Done". The discoverability layer
+  for non-technical users — everything it reaches also works without it.
+- **Header buttons:** ✏️ Edit · ⚙️ routine settings page · 🌗/☀️/🌙 theme cycle.
+- **Settings page (`/settings.html`):** full routine forms per day (people incl. custom
+  activities, fixed dinner, activities/chores lists). Save → wall syncs within a poll.
+- **Phone (≤900px):** stacked day cards, past days hidden, all editors work the same.
+- Optimistic updates: reflect immediately, then PATCH/PUT; poll reconciles (~20s).
+- While any editor is open, re-renders and template refetches pause (`editing` flag).
+- Empty states: "add dinner", "+ note", "—" for empty schedule/activity cells.
 
 ## Things to get right
 - The drop-off/pickup ownership must be the most scannable thing on the board — it's the

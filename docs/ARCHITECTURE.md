@@ -23,25 +23,30 @@
   start (Sunday) ISO date** so each week is independent, **chores auto-reset**, and
   overrides expire when the week rolls over.
 
-## Proposed file tree
+## File tree (as built)
 ```
 family-planner/
 ├── CLAUDE.md
+├── README.md                 # run + Synology/Fully Kiosk deploy guide
 ├── docs/                     # these docs
-├── package.json
+├── package.json              # ESM; Express is the only dependency
 ├── Dockerfile
-├── docker-compose.yml
+├── docker-compose.yml        # host 3210 → 3000, ./data bind mount, TZ Sydney
 ├── .gitignore
 ├── server/
-│   ├── server.js             # Express app: static + API
-│   ├── store.js              # JSON file load/save (atomic), week defaults
-│   └── data/
-│       └── state.json        # persisted dynamic state (bind-mounted; gitignored)
+│   ├── server.js             # Express: static + /api/week + /api/template
+│   ├── store.js              # atomic JSON persistence, merges, validation
+│   ├── default-template.js   # seed routine + seed activity catalog
+│   └── data/                 # gitignored, bind-mounted in Docker
+│       ├── state.json        # weekly dynamic state
+│       └── template.json     # live routine (created on first in-app edit)
 └── public/
-    ├── index.html
-    ├── config.js             # FAMILY, LOCATIONS, WEEK_TEMPLATE (from SCHEDULE.md)
-    ├── styles.css
-    └── app.js                # render, poll, optimistic edits
+    ├── index.html            # the board
+    ├── settings.html         # routine editor page
+    ├── config.js             # FAMILY, LOCATIONS, editor location lists (static)
+    ├── styles.css            # themes, grid, chips, editors, settings
+    ├── app.js                # render, poll, weather, all inline editors
+    └── settings.js           # settings-page forms → PUT /api/template
 ```
 
 ## Dynamic state shape
