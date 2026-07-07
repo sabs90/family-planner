@@ -486,6 +486,48 @@ body {
 .editor-actions button.save { background: var(--accent); border-color: var(--accent); color: #fff; }
 .editor-actions button.reset { color: var(--text-3); }
 
+/* Cell add button + inline list editors (activities / chores) */
+.cell-add {
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-3);
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 99px;
+  padding: 1px 9px;
+  cursor: pointer;
+  width: fit-content;
+}
+.cell-add:hover { color: var(--text-2); border-color: var(--text-3); }
+
+.list-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 100%;
+  cursor: default;
+}
+
+.list-editor-rows { display: flex; flex-direction: column; gap: 5px; }
+
+.le-row { display: flex; align-items: center; gap: 6px; }
+.le-row .task-label { flex: 1; }
+
+.le-add { display: flex; flex-wrap: wrap; gap: 5px; }
+.le-add select, .le-add input {
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 7px;
+  min-width: 0;
+  max-width: 100%;
+}
+.le-add input { flex: 1 1 100%; }
+
 /* "This week only" override marker */
 .ovr-flag {
   font-size: 0.64rem;

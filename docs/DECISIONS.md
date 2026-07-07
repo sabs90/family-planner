@@ -88,3 +88,14 @@ Newest at bottom. Append with today's date when decisions are made or changed.
 - Chore identity: slugs are stable once created (renaming a chore keeps its slug so the
   current week's ticks survive); new chores get slugified-unique slugs on save.
 - `docs/SCHEDULE.md` demoted from runtime source of truth to baseline/seed documentation.
+
+## 2026-07-07 — Design review round 4
+- **Humidity removed** from the weather line (too busy); kept icon + min–max + rain mm.
+- **Chores editable inline**: "+" in each chores cell → in-cell editor (remove ✕ / add with
+  label + person). Edits are routine (template) changes; one-offs belong in day Notes.
+- **Activities editable inline**: "+" in each activities cell → person dropdown + activity
+  dropdown drawn from a **reusable activity catalog** (`template.activities`, seeded with
+  Pilates/Futsal/Swimming/etc). "➕ New activity…" appends to the catalog. Also routine-level.
+- Server preserves the catalog when a PUT omits `activities` (settings page sends week only).
+- Template refetch is skipped while an inline editor is open (open editors hold live
+  references into TEMPLATE; replacing it mid-edit would orphan their changes).

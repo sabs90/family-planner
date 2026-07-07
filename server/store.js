@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_WEEK } from './default-template.js';
+import { DEFAULT_WEEK, DEFAULT_ACTIVITIES } from './default-template.js';
 
 const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
@@ -27,7 +27,8 @@ function saveJson(file, obj) {
 
 const state = loadJson(STATE_FILE, { weeks: {} });
 // Routine template: seeded from default-template.js until first saved edit.
-let template = loadJson(TEMPLATE_FILE, { week: DEFAULT_WEEK });
+let template = loadJson(TEMPLATE_FILE, { week: DEFAULT_WEEK, activities: DEFAULT_ACTIVITIES });
+template.activities ??= DEFAULT_ACTIVITIES; // template.json saved before the catalog existed
 
 // ---------- template (the standing routine) ----------
 export function getTemplate() {
@@ -47,7 +48,12 @@ export function putTemplate(next) {
     day.events = Array.isArray(day.events) ? day.events : [];
     day.tasks = Array.isArray(day.tasks) ? day.tasks : [];
   });
-  template = { week: next.week };
+  // Activity catalog: replace when provided, otherwise preserve (the settings
+  // page PUTs { week } only and must not wipe the catalog).
+  const activities = Array.isArray(next.activities)
+    ? next.activities.filter((a) => a && typeof a.label === 'string' && a.label.trim())
+    : template.activities;
+  template = { week: next.week, activities };
   saveJson(TEMPLATE_FILE, template);
   return template;
 }

@@ -1,5 +1,15 @@
 // Seed routine — used only until the first saved edit creates data/template.json.
 // Human-readable source of truth: docs/SCHEDULE.md.
+
+// Reusable activity catalog for the board's activity picker; grows via "add new".
+export const DEFAULT_ACTIVITIES = [
+  { label: 'Pilates', icon: '🧘' },
+  { label: 'Futsal', icon: '⚽' },
+  { label: 'Swimming', icon: '🏊' },
+  { label: 'Family dinner @ Mascot', icon: '🍽️' },
+  { label: 'Family fun adventure day', icon: '🎉' },
+];
+
 export const DEFAULT_WEEK = [
   {
     key: 'sunday', label: 'Sunday',

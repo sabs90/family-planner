@@ -13,6 +13,7 @@ const WEATHER_TTL = 60 * 60 * 1000; // refetch hourly
 // ---------- state ----------
 let weekStart = null;       // 'YYYY-MM-DD' of this week's Sunday
 let TEMPLATE = [];          // the standing routine, from GET /api/template
+let ACTIVITIES = [];        // reusable activity catalog (grows via "add new")
 let week = { meals: {}, tasks: {}, notes: '', dayNotes: {}, overrides: {} };
 let weather = {};           // dateIso → { icon, min, max, rain, hum }
 let weatherFetched = 0;
@@ -73,7 +74,11 @@ async function fetchWeek() {
 
 async function fetchTemplate() {
   const res = await fetch('/api/template');
-  if (res.ok) TEMPLATE = (await res.json()).week;
+  if (res.ok) {
+    const t = await res.json();
+    TEMPLATE = t.week;
+    ACTIVITIES = t.activities || [];
+  }
 }
 
 function patchWeek(patch) {
@@ -89,7 +94,7 @@ function putTemplate() {
   fetch('/api/template', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ week: TEMPLATE }),
+    body: JSON.stringify({ week: TEMPLATE, activities: ACTIVITIES }),
   }).catch(() => {});
 }
 
@@ -409,18 +414,178 @@ function openMealEditor(row, day) {
 }
 
 // ---------- activities / chores / day notes ----------
-function eventsContent(day) {
-  return day.events.map((ev) => {
-    const chip = personColor(el('span', 'evening-chip'), ev.personId);
-    if (ev.icon) chip.append(el('span', null, ev.icon));
-    chip.append(el('span', null,
-      ev.personId && FAMILY[ev.personId] ? `${FAMILY[ev.personId].short} · ${ev.label}` : ev.label));
-    return chip;
+function eventChip(ev) {
+  const chip = personColor(el('span', 'evening-chip'), ev.personId);
+  if (ev.icon) chip.append(el('span', null, ev.icon));
+  chip.append(el('span', null,
+    ev.personId && FAMILY[ev.personId] ? `${FAMILY[ev.personId].short} · ${ev.label}` : ev.label));
+  return chip;
+}
+
+function addButton(label, onOpen) {
+  const btn = el('button', 'cell-add', label);
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onOpen(btn.closest('.cell') || btn.closest('.lane'));
   });
+  return btn;
+}
+
+function eventsContent(day) {
+  const nodes = day.events.map(eventChip);
+  nodes.push(addButton('+', (c) => openActivitiesEditor(c, day)));
+  return nodes;
+}
+
+function openActivitiesEditor(container, day) {
+  if (editing || !container) return;
+  editing = true;
+  container.textContent = '';
+  const ed = el('div', 'list-editor');
+
+  const list = el('div', 'list-editor-rows');
+  const rebuild = () => {
+    list.textContent = '';
+    for (const ev of day.events) {
+      const row = el('div', 'le-row');
+      const rm = el('button', 'rm-btn', '✕');
+      rm.addEventListener('click', () => {
+        day.events.splice(day.events.indexOf(ev), 1);
+        putTemplate();
+        rebuild();
+      });
+      row.append(eventChip(ev), rm);
+      list.append(row);
+    }
+  };
+  rebuild();
+
+  const who = document.createElement('select');
+  who.append(new Option('Everyone', ''));
+  for (const [pid, p] of Object.entries(FAMILY)) who.append(new Option(p.short, pid));
+
+  const what = document.createElement('select');
+  ACTIVITIES.forEach((a, i) => what.append(new Option(`${a.icon || '•'} ${a.label}`, String(i))));
+  what.append(new Option('➕ New activity…', '__new__'));
+
+  const newInput = document.createElement('input');
+  newInput.type = 'text';
+  newInput.placeholder = 'New activity name';
+  newInput.style.display = 'none';
+  what.addEventListener('change', () => {
+    newInput.style.display = what.value === '__new__' ? '' : 'none';
+    if (what.value === '__new__') newInput.focus();
+  });
+
+  const addRow = el('div', 'le-add');
+  addRow.append(who, what, newInput);
+
+  const actions = el('div', 'editor-actions');
+  const add = el('button', 'save', 'Add');
+  const done = el('button', null, 'Done');
+  add.addEventListener('click', () => {
+    let catalogEntry;
+    if (what.value === '__new__') {
+      const label = newInput.value.trim();
+      if (!label) return;
+      catalogEntry = { label };
+      ACTIVITIES.push(catalogEntry);
+      newInput.value = '';
+    } else {
+      catalogEntry = ACTIVITIES[Number(what.value)];
+      if (!catalogEntry) return;
+    }
+    const ev = { label: catalogEntry.label };
+    if (catalogEntry.icon) ev.icon = catalogEntry.icon;
+    if (who.value) ev.personId = who.value;
+    day.events.push(ev);
+    putTemplate();
+    rebuild();
+  });
+  done.addEventListener('click', () => {
+    editing = false;
+    renderBoard();
+  });
+  actions.append(add, done);
+
+  ed.append(list, addRow, actions);
+  container.append(ed);
+}
+
+function taskSlug(day, label) {
+  const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'task';
+  const used = new Set(day.tasks.map((t) => t.slug));
+  let slug = base, n = 2;
+  while (used.has(slug)) slug = `${base}-${n++}`;
+  return slug;
+}
+
+function openChoresEditor(container, day) {
+  if (editing || !container) return;
+  editing = true;
+  container.textContent = '';
+  const ed = el('div', 'list-editor');
+
+  const list = el('div', 'list-editor-rows');
+  const rebuild = () => {
+    list.textContent = '';
+    for (const task of day.tasks) {
+      const row = el('div', 'le-row');
+      const label = el('span', 'task-label', task.label);
+      const meta = personColor(el('span', 'task-meta'), task.personId);
+      meta.textContent = task.personId && FAMILY[task.personId]
+        ? FAMILY[task.personId].short : (task.when || '');
+      const rm = el('button', 'rm-btn', '✕');
+      rm.addEventListener('click', () => {
+        day.tasks.splice(day.tasks.indexOf(task), 1);
+        putTemplate();
+        rebuild();
+      });
+      row.append(label, meta, rm);
+      list.append(row);
+    }
+  };
+  rebuild();
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'New chore';
+
+  const who = document.createElement('select');
+  who.append(new Option('Anyone', ''));
+  for (const pid of PARENTS) who.append(new Option(FAMILY[pid].short, pid));
+
+  const addRow = el('div', 'le-add');
+  addRow.append(input, who);
+
+  const actions = el('div', 'editor-actions');
+  const add = el('button', 'save', 'Add');
+  const done = el('button', null, 'Done');
+  const addTask = () => {
+    const label = input.value.trim();
+    if (!label) return;
+    const task = { slug: taskSlug(day, label), label };
+    if (who.value) task.personId = who.value;
+    day.tasks.push(task);
+    putTemplate();
+    rebuild();
+    input.value = '';
+    input.focus();
+  };
+  add.addEventListener('click', addTask);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); });
+  done.addEventListener('click', () => {
+    editing = false;
+    renderBoard();
+  });
+  actions.append(add, done);
+
+  ed.append(list, addRow, actions);
+  container.append(ed);
 }
 
 function tasksContent(day) {
-  return day.tasks.map((task) => {
+  const rows = day.tasks.map((task) => {
     const id = `${day.key}::${task.slug}`;
     const done = Boolean(week.tasks[id]);
     const row = el('div', `task-row${done ? ' done' : ''}`);
@@ -437,6 +602,8 @@ function tasksContent(day) {
     });
     return row;
   });
+  rows.push(addButton('+', (c) => openChoresEditor(c, day)));
+  return rows;
 }
 
 function dayNoteContent(day) {
@@ -487,7 +654,6 @@ function weatherLine(dayIso) {
     const mm = w.rain < 1 && w.rain > 0 ? w.rain.toFixed(1) : Math.round(w.rain);
     line.append(el('span', 'wx-rain', `☔ ${mm}mm`));
   }
-  if (w.hum != null) line.append(el('span', 'wx-hum', `💧 ${w.hum}%`));
   return line;
 }
 
@@ -612,7 +778,9 @@ async function refresh() {
     weatherFetched = 0;                                                       // refetch range
   }
   weekStart = ws;
-  await Promise.all([fetchWeek(), fetchTemplate(), fetchWeather()]);
+  // Don't refetch the template mid-edit: open editors hold live references into
+  // TEMPLATE, and replacing it would silently orphan their changes.
+  await Promise.all([fetchWeek(), editing ? null : fetchTemplate(), fetchWeather()]);
   renderHeader();
   renderNotes();
   renderBoard();
