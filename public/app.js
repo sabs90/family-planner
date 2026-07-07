@@ -18,6 +18,7 @@ let week = { meals: {}, tasks: {}, notes: '', dayNotes: {}, overrides: {} };
 let weather = {};           // dateIso → { icon, min, max, rain, hum }
 let weatherFetched = 0;
 let editing = false;        // true while an inline editor is open → pause re-render
+let editMode = false;       // header ✏️ toggle: highlight editables, tap-to-edit everywhere
 
 const narrowMq = window.matchMedia('(max-width: 900px)');
 
@@ -600,7 +601,8 @@ function tasksContent(day) {
       ? FAMILY[task.personId].short : (task.when || '');
     row.append(meta);
     row.addEventListener('click', () => {
-      if (editing) return; // a long-press just opened the chores editor
+      if (editing) return;  // a long-press just opened the chores editor
+      if (editMode) return; // in edit mode the tap bubbles up and opens the editor
       const next = !week.tasks[id];
       week.tasks[id] = next;
       patchWeek({ tasks: { [id]: next } });
@@ -727,11 +729,15 @@ function renderGrid(board) {
         cell.classList.add('editable');
         cell.addEventListener('click', () => openPersonEditor(cell, day, row.group, row.id));
       }
+      if (row.type === 'group') cell.classList.add('can-edit');
       if (row.tapEdit) {
         cell.classList.add('editable');
         cell.addEventListener('click', () => row.tapEdit(cell, day));
       }
-      if (row.holdEdit) onLongPress(cell, () => row.holdEdit(cell, day));
+      if (row.holdEdit) {
+        onLongPress(cell, () => row.holdEdit(cell, day));
+        if (editMode) cell.addEventListener('click', () => row.holdEdit(cell, day));
+      }
       grid.append(cell);
     });
   }
@@ -774,7 +780,10 @@ function renderStacked(board) {
         const body = el('div', 'cell-body');
         body.append(...content);
         if (row.tapEdit) body.addEventListener('click', () => row.tapEdit(body, day));
-        if (row.holdEdit) onLongPress(body, () => row.holdEdit(body, day));
+        if (row.holdEdit) {
+          onLongPress(body, () => row.holdEdit(body, day));
+          if (editMode) body.addEventListener('click', () => row.holdEdit(body, day));
+        }
         lane.append(body);
       }
       card.append(lane);
@@ -807,10 +816,20 @@ function tick() {
   else if (!editing) renderBoard();
 }
 
+function toggleEditMode() {
+  editMode = !editMode;
+  document.body.classList.toggle('edit-mode', editMode);
+  const btn = document.getElementById('edit-btn');
+  btn.textContent = editMode ? '✓ Done' : '✏️ Edit';
+  btn.classList.toggle('active', editMode);
+  if (!editing) renderBoard();
+}
+
 applyTheme();
 weekStart = currentWeekStart();
 document.getElementById('notes-strip').addEventListener('click', openNotesEditor);
 document.getElementById('theme-btn').addEventListener('click', cycleTheme);
+document.getElementById('edit-btn').addEventListener('click', toggleEditMode);
 narrowMq.addEventListener('change', renderBoard);
 refresh();
 setInterval(refresh, POLL_MS);

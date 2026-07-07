@@ -103,6 +103,23 @@ body {
 .theme-btn:hover { color: var(--text); }
 
 .settings-link { text-decoration: none; padding: 4px 9px; }
+
+.theme-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.theme-btn.active:hover { color: #fff; }
+
+/* Edit mode: make every editable cell visibly tappable */
+body.edit-mode .cell.editable,
+body.edit-mode .cell.can-edit,
+body.edit-mode .cell-body,
+body.edit-mode .notes-strip {
+  outline: 1.5px dashed color-mix(in srgb, var(--accent) 50%, transparent);
+  outline-offset: -4px;
+  cursor: pointer;
+}
 .back-link {
   font-size: 0.95rem;
   font-weight: 700;

@@ -103,3 +103,7 @@ Newest at bottom. Append with today's date when decisions are made or changed.
   **tap** an Activities cell to open its editor (those cells had no other tap action);
   **press-and-hold ~0.5s** a Chores cell to edit (plain tap still toggles a chore).
   Deleting chores/activities is via ✕ rows inside those editors.
+- **✏️ Edit button** added to the header for discoverability (gestures alone too hidden).
+  Toggling it on outlines every editable cell (dashed accent) and makes chores cells open
+  their editor on plain tap (chore toggling paused in edit mode). "✓ Done" exits. Direct
+  interactions (tick chores, tap dinner/notes/people) still work outside edit mode.
