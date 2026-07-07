@@ -102,6 +102,15 @@ body {
 }
 .theme-btn:hover { color: var(--text); }
 
+.settings-link { text-decoration: none; padding: 4px 9px; }
+.back-link {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-2);
+  text-decoration: none;
+}
+.back-link:hover { color: var(--text); }
+
 /* ---------- Notes strip ---------- */
 .notes-strip {
   display: flex;
@@ -413,6 +422,82 @@ body {
   letter-spacing: 0.05em;
 }
 
+/* Inline person-cell editor */
+.cell.editable { cursor: pointer; }
+.cell.editable:hover { background: color-mix(in srgb, var(--text-3) 6%, transparent); }
+.cell.editable.today:hover { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); }
+
+.cell-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  cursor: default;
+}
+
+.cell-editor select {
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  width: 100%;
+}
+
+.scope-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.scope-btn {
+  flex: 1;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-3);
+  padding: 4px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scope-btn.active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.editor-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.editor-actions button {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.editor-actions button.save { background: var(--accent); border-color: var(--accent); color: #fff; }
+.editor-actions button.reset { color: var(--text-3); }
+
+/* "This week only" override marker */
+.ovr-flag {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 99px;
+  padding: 1px 7px;
+}
+
 /* Per-day notes */
 .day-note {
   font-size: 0.82rem;
@@ -485,6 +570,124 @@ body {
   .board { overflow-y: auto; }
   .topbar h1 { font-size: 1.25rem; }
   .clock { font-size: 1.25rem; }
+}
+
+/* ---------- Settings page ---------- */
+.settings-page { height: auto; min-height: 100%; }
+
+.settings-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+  padding-bottom: 70px; /* room for the save bar */
+}
+
+.set-day {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.set-day h2 { font-size: 1.05rem; font-weight: 800; }
+
+.set-block { display: flex; flex-direction: column; gap: 6px; }
+
+.set-block-title {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.set-list { display: flex; flex-direction: column; gap: 6px; }
+
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.set-row .set-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.set-name { font-size: 0.82rem; font-weight: 800; width: 3.2em; flex: none; }
+
+.set-row select,
+.set-row input,
+.set-block > input {
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  min-width: 0;
+}
+
+.set-row input { flex: 1; }
+.set-row select { flex: none; max-width: 46%; }
+.set-row .set-time { flex: none; width: 4.5em; }
+.set-row .set-icon { flex: none; width: 3em; text-align: center; }
+
+.rm-btn {
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+}
+.rm-btn:hover { color: var(--c-daycare); }
+
+.add-btn {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-2);
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  width: fit-content;
+}
+.add-btn:hover { color: var(--text); border-color: var(--text-3); }
+
+.save-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 10px 18px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--border);
+}
+
+.save-status { font-size: 0.85rem; font-weight: 600; color: var(--text-2); }
+
+.save-btn {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 800;
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  border-radius: 10px;
+  padding: 8px 20px;
+  cursor: pointer;
 }
 
 /* ---------- Big wall display: scale everything up ---------- */

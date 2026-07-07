@@ -10,13 +10,18 @@
 - **Deploy:** one Docker container via Synology Container Manager, data dir bind-mounted so
   state survives container rebuilds.
 
-## Data split (important)
-- **Template (static, ships in `public/config.js`):** family + colors, locations, and the
-  recurring weekly routine from `docs/SCHEDULE.md` (work locations, kid care, drop-off/pickup,
-  fixed evening activities, prep task definitions). Rarely edited; not stored server-side.
-- **Dynamic (stored server-side, keyed by week):** meals + cook, chore/task completion,
-  free-text notes, and any one-off overrides. Keyed by **week start (Sunday) ISO date** so
-  each week is independent and **chores auto-reset** when the week rolls over.
+## Data split (updated 2026-07-07: template is now editable in-app)
+- **Static (`public/config.js`):** family members + roles, locations + colors, editor
+  location lists. Changes here still mean a redeploy (rare).
+- **Routine template (server-stored, `server/data/template.json`):** the standing weekly
+  schedule — work locations, kid care + drop-off/pickup, activities, chores, fixed meals.
+  Seeded from `server/default-template.js` on first boot; edited via the **settings page**
+  (`/settings.html`) or inline on the board with scope "Every week". **No container rebuild
+  needed to change the routine.**
+- **Dynamic (server-stored, keyed by week):** meals + cook, chore/task completion, weekly
+  notes, per-day notes, and **this-week-only overrides** of the routine. Keyed by **week
+  start (Sunday) ISO date** so each week is independent, **chores auto-reset**, and
+  overrides expire when the week rolls over.
 
 ## Proposed file tree
 ```
@@ -57,6 +62,10 @@ family-planner/
       "notes": "",                      // week-level notes strip
       "dayNotes": {                     // per-day one-off notes
         "thursday": "Illy photo day"
+      },
+      "overrides": {                    // this-week-only routine deviations
+        "tuesday": { "parents": { "raya": { "loc": "city" } },
+                     "kids": { "illy": { "loc": "home" } } }
       }
     }
   }
@@ -66,14 +75,19 @@ Task ids are `${day}::${slug}` (e.g. `sunday::pack-bags`). Slugs come from the t
 prep-task definitions so ids are stable.
 
 ## API
-- `GET  /api/week/:weekStart` → returns that week's record, creating a default (empty meals
-  from template defaults, all tasks false, empty notes) if absent.
-- `PATCH /api/week/:weekStart` → deep-merges a partial `{ meals?, tasks?, notes? }` into the
-  week record and persists. Last-write-wins (fine for a single family). Used for:
+- `GET  /api/template` → `{ week: [7 days] }` — the standing routine.
+- `PUT  /api/template` → replaces the routine (validated: 7 days, correct keys). Used by
+  the settings page and by inline "Every week" edits.
+- `GET  /api/week/:weekStart` → returns that week's record, or a default if absent.
+- `PATCH /api/week/:weekStart` → deep-merges a partial
+  `{ meals?, tasks?, notes?, dayNotes?, overrides? }` and persists. Last-write-wins (fine
+  for a single family). Used for:
   - toggling a task: `{ "tasks": { "sunday::meal-prep": true } }`
   - setting a meal: `{ "meals": { "monday": { "dish": "Butter chicken", "cookId": "raya" } } }`
-  - notes: `{ "notes": "..." }`
-- (Static assets served from `public/`.)
+  - notes / dayNotes: `{ "notes": "..." }` / `{ "dayNotes": { "thursday": "..." } }`
+  - this-week override: `{ "overrides": { "tuesday": { "parents": { "raya": { "loc": "city" } } } } }`
+    (value `null` = nothing scheduled; string `"__reset__"` = remove override, back to routine)
+- (Static assets served from `public/`; board at `/`, routine editor at `/settings.html`.)
 
 `weekStart` is computed client-side from "today": most recent Sunday
 (`d.getDate() - d.getDay()`), formatted `YYYY-MM-DD` in local (Sydney) time.

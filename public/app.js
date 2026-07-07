@@ -1,4 +1,4 @@
-import { FAMILY, PARENTS, KIDS, LOCATIONS, WEEK } from './config.js';
+import { FAMILY, PARENTS, KIDS, LOCATIONS, PARENT_LOCS, KID_LOCS } from './config.js';
 
 const POLL_MS = 20_000;   // dynamic-state poll
 const TICK_MS = 30_000;   // clock / today / theme recompute
@@ -12,8 +12,9 @@ const WEATHER_TTL = 60 * 60 * 1000; // refetch hourly
 
 // ---------- state ----------
 let weekStart = null;       // 'YYYY-MM-DD' of this week's Sunday
-let week = { meals: {}, tasks: {}, notes: '', dayNotes: {} };  // dynamic state from server
-let weather = {};           // dateIso → { icon, min, max }
+let TEMPLATE = [];          // the standing routine, from GET /api/template
+let week = { meals: {}, tasks: {}, notes: '', dayNotes: {}, overrides: {} };
+let weather = {};           // dateIso → { icon, min, max, rain, hum }
 let weatherFetched = 0;
 let editing = false;        // true while an inline editor is open → pause re-render
 
@@ -70,6 +71,11 @@ async function fetchWeek() {
   if (res.ok) week = await res.json();
 }
 
+async function fetchTemplate() {
+  const res = await fetch('/api/template');
+  if (res.ok) TEMPLATE = (await res.json()).week;
+}
+
 function patchWeek(patch) {
   // Optimistic: state already updated locally; fire-and-forget, poll reconciles.
   fetch(`/api/week/${weekStart}`, {
@@ -77,6 +83,22 @@ function patchWeek(patch) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
   }).catch(() => {});
+}
+
+function putTemplate() {
+  fetch('/api/template', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ week: TEMPLATE }),
+  }).catch(() => {});
+}
+
+// Effective schedule entry for a person-day: this week's override if one
+// exists (may be null = nothing scheduled), else the routine template.
+function effEntry(day, group, id) {
+  const g = (week.overrides || {})[day.key]?.[group];
+  if (g && id in g) return { entry: g[id], ovr: true };
+  return { entry: day[group][id], ovr: false };
 }
 
 // ---------- weather ----------
@@ -143,7 +165,7 @@ function renderHeader() {
   document.getElementById('week-range').textContent = `${fmt(start)} – ${fmt(end)}`;
 }
 
-// ---------- render: notes ----------
+// ---------- render: weekly notes strip ----------
 function renderNotes() {
   const textEl = document.getElementById('notes-text');
   if (!textEl) return; // notes editor is open
@@ -196,6 +218,7 @@ function locChip(entry) {
     return chip;
   }
   const loc = LOCATIONS[entry.loc];
+  if (!loc) return el('span', 'none', '—');
   chip.append(el('span', null, loc.icon), el('span', null, loc.label));
   if (loc.c) {
     chip.classList.add('tinted');
@@ -204,14 +227,20 @@ function locChip(entry) {
   return chip;
 }
 
+function ovrFlag() {
+  return el('span', 'ovr-flag', 'this wk');
+}
+
 function parentContent(day, id) {
-  const entry = day.parents[id];
-  return [entry ? locChip(entry) : el('span', 'none', '—')];
+  const { entry, ovr } = effEntry(day, 'parents', id);
+  const nodes = [entry ? locChip(entry) : el('span', 'none', '—')];
+  if (ovr) nodes.push(ovrFlag());
+  return nodes;
 }
 
 function kidContent(day, id) {
-  const entry = day.kids[id];
-  if (!entry) return [el('span', 'none', '—')];
+  const { entry, ovr } = effEntry(day, 'kids', id);
+  if (!entry) return [el('span', 'none', '—'), ...(ovr ? [ovrFlag()] : [])];
   const nodes = [locChip(entry)];
   if (entry.dp) {
     const chip = personColor(el('span', 'dp-chip'), entry.dp);
@@ -225,9 +254,96 @@ function kidContent(day, id) {
       nodes.push(chip);
     }
   }
+  if (ovr) nodes.push(ovrFlag());
   return nodes;
 }
 
+// ---------- inline person editor (location + D/P + scope) ----------
+function openPersonEditor(container, day, group, id) {
+  if (editing) return;
+  editing = true;
+  const { entry, ovr } = effEntry(day, group, id);
+  const isKid = group === 'kids';
+
+  container.textContent = '';
+  const form = el('div', 'cell-editor');
+  form.addEventListener('click', (e) => e.stopPropagation());
+
+  const locSel = document.createElement('select');
+  locSel.append(new Option('— nothing', ''));
+  for (const locId of (isKid ? KID_LOCS : PARENT_LOCS)) {
+    locSel.append(new Option(`${LOCATIONS[locId].icon} ${LOCATIONS[locId].label}`, locId));
+  }
+  locSel.value = entry?.loc || '';
+  form.append(locSel);
+
+  let dpSel = null;
+  if (isKid) {
+    dpSel = document.createElement('select');
+    dpSel.append(new Option('Drop/pick: —', ''));
+    for (const pid of PARENTS) dpSel.append(new Option(`${FAMILY[pid].short} · drop + pick`, pid));
+    dpSel.value = entry?.dp || '';
+    form.append(dpSel);
+  }
+
+  // Scope: one-off override vs standing routine change
+  const scope = el('div', 'scope-toggle');
+  const scopeWeek = el('button', 'scope-btn active', 'This week');
+  const scopeAlways = el('button', 'scope-btn', 'Every week');
+  let scopeVal = 'week';
+  scopeWeek.addEventListener('click', () => {
+    scopeVal = 'week';
+    scopeWeek.classList.add('active'); scopeAlways.classList.remove('active');
+  });
+  scopeAlways.addEventListener('click', () => {
+    scopeVal = 'always';
+    scopeAlways.classList.add('active'); scopeWeek.classList.remove('active');
+  });
+  scope.append(scopeWeek, scopeAlways);
+  form.append(scope);
+
+  const actions = el('div', 'editor-actions');
+  const save = el('button', 'save', 'Save');
+  const cancel = el('button', null, 'Cancel');
+  actions.append(save, cancel);
+  if (ovr) {
+    const reset = el('button', 'reset', '↩ Routine');
+    reset.addEventListener('click', () => close('reset'));
+    actions.append(reset);
+  }
+  form.append(actions);
+  container.append(form);
+  locSel.focus();
+
+  function setLocalOverride(value) {
+    const g = ((week.overrides ??= {})[day.key] ??= {});
+    (g[group] ??= {})[id] = value;
+  }
+
+  const close = (action) => {
+    editing = false;
+    if (action === 'save') {
+      let e = locSel.value ? { loc: locSel.value } : null;
+      if (isKid && e && dpSel.value) e.dp = dpSel.value;
+      if (scopeVal === 'week') {
+        setLocalOverride(e);
+        patchWeek({ overrides: { [day.key]: { [group]: { [id]: e } } } });
+      } else {
+        day[group][id] = e;   // day is a live reference into TEMPLATE
+        putTemplate();
+      }
+    } else if (action === 'reset') {
+      const g = (week.overrides || {})[day.key]?.[group];
+      if (g) delete g[id];
+      patchWeek({ overrides: { [day.key]: { [group]: { [id]: '__reset__' } } } });
+    }
+    renderBoard();
+  };
+  save.addEventListener('click', () => close('save'));
+  cancel.addEventListener('click', () => close('cancel'));
+}
+
+// ---------- dinner ----------
 function mealContent(day) {
   if (day.mealFixed) {
     const row = el('div', 'meal-row meal-fixed');
@@ -292,12 +408,13 @@ function openMealEditor(row, day) {
   });
 }
 
+// ---------- activities / chores / day notes ----------
 function eventsContent(day) {
   return day.events.map((ev) => {
     const chip = personColor(el('span', 'evening-chip'), ev.personId);
     if (ev.icon) chip.append(el('span', null, ev.icon));
     chip.append(el('span', null,
-      ev.personId ? `${FAMILY[ev.personId].short} · ${ev.label}` : ev.label));
+      ev.personId && FAMILY[ev.personId] ? `${FAMILY[ev.personId].short} · ${ev.label}` : ev.label));
     return chip;
   });
 }
@@ -309,7 +426,8 @@ function tasksContent(day) {
     const row = el('div', `task-row${done ? ' done' : ''}`);
     row.append(el('span', 'task-check', '✓'), el('span', 'task-label', task.label));
     const meta = personColor(el('span', 'task-meta'), task.personId);
-    meta.textContent = task.personId ? FAMILY[task.personId].short : (task.when || '');
+    meta.textContent = task.personId && FAMILY[task.personId]
+      ? FAMILY[task.personId].short : (task.when || '');
     row.append(meta);
     row.addEventListener('click', () => {
       const next = !week.tasks[id];
@@ -376,8 +494,8 @@ function weatherLine(dayIso) {
 // ---------- render: board ----------
 // Row definitions: label rail + one cell builder per day.
 const ROWS = [
-  ...PARENTS.map((id) => ({ type: 'person', id, build: (d) => parentContent(d, id) })),
-  ...KIDS.map((id) => ({ type: 'person', id, build: (d) => kidContent(d, id) })),
+  ...PARENTS.map((id) => ({ type: 'person', group: 'parents', id, build: (d) => parentContent(d, id) })),
+  ...KIDS.map((id) => ({ type: 'person', group: 'kids', id, build: (d) => kidContent(d, id) })),
   { type: 'group', label: 'Dinner',     build: mealContent },
   { type: 'group', label: 'Activities', build: eventsContent },
   { type: 'group', label: 'Chores',     build: tasksContent, cls: 'chores' },
@@ -404,7 +522,7 @@ function renderGrid(board) {
 
   // Header row: corner + day headers with date + weather
   grid.append(el('div', 'cell head first'));
-  WEEK.forEach((day, i) => {
+  TEMPLATE.forEach((day, i) => {
     const date = dateOfDay(i);
     const dayIso = iso(date);
     const cell = el('div', `cell head${dayClass(dayIso, todayIso)}`);
@@ -431,10 +549,14 @@ function renderGrid(board) {
     grid.append(label);
 
     // Day cells
-    WEEK.forEach((day, i) => {
+    TEMPLATE.forEach((day, i) => {
       const dayIso = iso(dateOfDay(i));
       const cell = el('div', `cell${dayClass(dayIso, todayIso)}${row.cls ? ' ' + row.cls : ''}`);
       cell.append(...row.build(day));
+      if (row.type === 'person') {
+        cell.classList.add('editable');
+        cell.addEventListener('click', () => openPersonEditor(cell, day, row.group, row.id));
+      }
       grid.append(cell);
     });
   }
@@ -445,7 +567,7 @@ function renderGrid(board) {
 // Phone layout: stacked day cards (label rail doesn't fit → names shown inline).
 function renderStacked(board) {
   const todayIso = iso(new Date());
-  WEEK.forEach((day, i) => {
+  TEMPLATE.forEach((day, i) => {
     const date = dateOfDay(i);
     const dayIso = iso(date);
     if (dayIso < todayIso) return; // phone: hide past days, focus on now
@@ -468,10 +590,14 @@ function renderStacked(board) {
         const pr = personColor(el('div', 'label-name'), row.id);
         pr.append(el('span', 'dot'), el('span', null, FAMILY[row.id].short));
         lane.append(pr);
+        const body = el('div', 'cell-body');
+        body.append(...content);
+        body.addEventListener('click', () => openPersonEditor(body, day, row.group, row.id));
+        lane.append(body);
       } else {
         lane.append(el('div', 'lane-title', row.label));
+        lane.append(...content);
       }
-      lane.append(...content);
       card.append(lane);
     }
     board.append(card);
@@ -482,11 +608,11 @@ function renderStacked(board) {
 async function refresh() {
   const ws = currentWeekStart();
   if (ws !== weekStart) {
-    week = { meals: {}, tasks: {}, notes: '', dayNotes: {} }; // week rolled over
-    weatherFetched = 0;                                        // refetch for the new range
+    week = { meals: {}, tasks: {}, notes: '', dayNotes: {}, overrides: {} }; // week rolled over
+    weatherFetched = 0;                                                       // refetch range
   }
   weekStart = ws;
-  await Promise.all([fetchWeek(), fetchWeather()]);
+  await Promise.all([fetchWeek(), fetchTemplate(), fetchWeather()]);
   renderHeader();
   renderNotes();
   renderBoard();

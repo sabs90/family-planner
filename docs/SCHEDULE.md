@@ -1,7 +1,12 @@
 # Weekly Routine — Source of Truth
 
-This is the canonical description of the recurring week. It feeds the frontend template
-config (`public/config.js`). Update this doc first when the routine changes, then the code.
+This is the canonical human-readable description of the recurring week.
+
+**Since 2026-07-07 the live routine is editable in-app** (⚙️ settings page, or tap a cell
+on the board and choose "Every week") and is stored server-side in
+`server/data/template.json`. This doc seeds `server/default-template.js` and documents the
+baseline; in-app edits are NOT mirrored back here automatically. Treat this as the starting
+point, `template.json` as the runtime truth.
 
 ## Conventions
 - **Week starts Sunday**, column order **Sun → Sat** (Sunday prep sets up the week).

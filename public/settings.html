@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Routine Settings — Family Planner</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+</head>
+<body class="settings-page">
+  <header class="topbar">
+    <div class="topbar-title">
+      <a href="./" class="back-link">← Board</a>
+      <h1>Routine</h1>
+    </div>
+    <div class="topbar-clock">
+      <span class="today-label">the standing weekly schedule — edits apply every week</span>
+    </div>
+  </header>
+
+  <main id="days" class="settings-days"></main>
+
+  <div class="save-bar">
+    <span id="save-status" class="save-status"></span>
+    <button id="save-btn" class="save-btn">Save routine</button>
+  </div>
+
+  <script type="module" src="settings.js"></script>
+</body>
+</html>

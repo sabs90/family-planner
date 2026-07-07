@@ -70,3 +70,21 @@ Newest at bottom. Append with today's date when decisions are made or changed.
 - **Per-day notes row** at the bottom of the grid — tap a day's cell to add one-off info
   ("photo day", etc). Stored per week as `dayNotes.<day>`; server deep-merges and upgrades
   pre-existing week records that lack the field. Weekly notes strip unchanged.
+
+## 2026-07-07 — Schedule editing (round 3)
+- **Rejected drag-and-drop**: the data is categorical (which location, which parent), not
+  positional — dragging chips maps badly to the real edits and is fiddly on touch.
+- **Chosen: inline tap-to-edit + settings page** (user picked "both").
+  - Tap any person cell on the board → in-cell editor: location select, D/P select (kids),
+    and a **scope toggle: "This week" (default) vs "Every week"**.
+  - ⚙️ in the header → `/settings.html`: full routine forms per day — people (incl. custom
+    activity + time), fixed dinner, add/remove activities and chores.
+- **Template moved server-side** (`template.json`, seeded from `server/default-template.js`;
+  `GET/PUT /api/template`). Routine edits no longer require a container rebuild.
+  `public/config.js` retains only people/locations.
+- **This-week overrides** live in the week record (`overrides.<day>.<group>.<person>`), so
+  they expire automatically at week rollover. Sentinel `"__reset__"` clears an override;
+  `null` means "nothing scheduled". Overridden cells show a dashed **"this wk"** badge.
+- Chore identity: slugs are stable once created (renaming a chore keeps its slug so the
+  current week's ticks survive); new chores get slugified-unique slugs on save.
+- `docs/SCHEDULE.md` demoted from runtime source of truth to baseline/seed documentation.
