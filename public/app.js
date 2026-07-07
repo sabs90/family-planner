@@ -422,19 +422,22 @@ function eventChip(ev) {
   return chip;
 }
 
-function addButton(label, onOpen) {
-  const btn = el('button', 'cell-add', label);
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    onOpen(btn.closest('.cell') || btn.closest('.lane'));
+// Press-and-hold to edit (used where plain tap already means something else).
+function onLongPress(node, fn) {
+  let timer = null;
+  node.addEventListener('pointerdown', () => {
+    if (editing) return;
+    timer = setTimeout(() => { timer = null; fn(); }, 550);
   });
-  return btn;
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) {
+    node.addEventListener(ev, () => { clearTimeout(timer); timer = null; });
+  }
+  node.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
 function eventsContent(day) {
-  const nodes = day.events.map(eventChip);
-  nodes.push(addButton('+', (c) => openActivitiesEditor(c, day)));
-  return nodes;
+  if (!day.events.length) return [el('span', 'none', '—')];
+  return day.events.map(eventChip);
 }
 
 function openActivitiesEditor(container, day) {
@@ -442,6 +445,7 @@ function openActivitiesEditor(container, day) {
   editing = true;
   container.textContent = '';
   const ed = el('div', 'list-editor');
+  ed.addEventListener('click', (e) => e.stopPropagation());
 
   const list = el('div', 'list-editor-rows');
   const rebuild = () => {
@@ -525,6 +529,7 @@ function openChoresEditor(container, day) {
   editing = true;
   container.textContent = '';
   const ed = el('div', 'list-editor');
+  ed.addEventListener('click', (e) => e.stopPropagation());
 
   const list = el('div', 'list-editor-rows');
   const rebuild = () => {
@@ -585,7 +590,7 @@ function openChoresEditor(container, day) {
 }
 
 function tasksContent(day) {
-  const rows = day.tasks.map((task) => {
+  return day.tasks.map((task) => {
     const id = `${day.key}::${task.slug}`;
     const done = Boolean(week.tasks[id]);
     const row = el('div', `task-row${done ? ' done' : ''}`);
@@ -595,6 +600,7 @@ function tasksContent(day) {
       ? FAMILY[task.personId].short : (task.when || '');
     row.append(meta);
     row.addEventListener('click', () => {
+      if (editing) return; // a long-press just opened the chores editor
       const next = !week.tasks[id];
       week.tasks[id] = next;
       patchWeek({ tasks: { [id]: next } });
@@ -602,8 +608,6 @@ function tasksContent(day) {
     });
     return row;
   });
-  rows.push(addButton('+', (c) => openChoresEditor(c, day)));
-  return rows;
 }
 
 function dayNoteContent(day) {
@@ -663,8 +667,8 @@ const ROWS = [
   ...PARENTS.map((id) => ({ type: 'person', group: 'parents', id, build: (d) => parentContent(d, id) })),
   ...KIDS.map((id) => ({ type: 'person', group: 'kids', id, build: (d) => kidContent(d, id) })),
   { type: 'group', label: 'Dinner',     build: mealContent },
-  { type: 'group', label: 'Activities', build: eventsContent },
-  { type: 'group', label: 'Chores',     build: tasksContent, cls: 'chores' },
+  { type: 'group', label: 'Activities', build: eventsContent, tapEdit: openActivitiesEditor },
+  { type: 'group', label: 'Chores',     build: tasksContent, cls: 'chores', holdEdit: openChoresEditor },
   { type: 'group', label: 'Notes',      build: dayNoteContent },
 ];
 
@@ -723,6 +727,11 @@ function renderGrid(board) {
         cell.classList.add('editable');
         cell.addEventListener('click', () => openPersonEditor(cell, day, row.group, row.id));
       }
+      if (row.tapEdit) {
+        cell.classList.add('editable');
+        cell.addEventListener('click', () => row.tapEdit(cell, day));
+      }
+      if (row.holdEdit) onLongPress(cell, () => row.holdEdit(cell, day));
       grid.append(cell);
     });
   }
@@ -762,7 +771,11 @@ function renderStacked(board) {
         lane.append(body);
       } else {
         lane.append(el('div', 'lane-title', row.label));
-        lane.append(...content);
+        const body = el('div', 'cell-body');
+        body.append(...content);
+        if (row.tapEdit) body.addEventListener('click', () => row.tapEdit(body, day));
+        if (row.holdEdit) onLongPress(body, () => row.holdEdit(body, day));
+        lane.append(body);
       }
       card.append(lane);
     }

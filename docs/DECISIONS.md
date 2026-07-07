@@ -99,3 +99,7 @@ Newest at bottom. Append with today's date when decisions are made or changed.
 - Server preserves the catalog when a PUT omits `activities` (settings page sends week only).
 - Template refetch is skipped while an inline editor is open (open editors hold live
   references into TEMPLATE; replacing it mid-edit would orphan their changes).
+- **"+" buttons removed same day** (visual noise on the wall). Replaced with gestures:
+  **tap** an Activities cell to open its editor (those cells had no other tap action);
+  **press-and-hold ~0.5s** a Chores cell to edit (plain tap still toggles a chore).
+  Deleting chores/activities is via ✕ rows inside those editors.

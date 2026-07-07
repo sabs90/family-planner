@@ -486,20 +486,8 @@ body {
 .editor-actions button.save { background: var(--accent); border-color: var(--accent); color: #fff; }
 .editor-actions button.reset { color: var(--text-3); }
 
-/* Cell add button + inline list editors (activities / chores) */
-.cell-add {
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: var(--text-3);
-  background: none;
-  border: 1px dashed var(--border);
-  border-radius: 99px;
-  padding: 1px 9px;
-  cursor: pointer;
-  width: fit-content;
-}
-.cell-add:hover { color: var(--text-2); border-color: var(--text-3); }
+/* Inline list editors (activities: tap to edit; chores: press-and-hold) */
+.cell.chores, .cell-body { user-select: none; -webkit-user-select: none; }
 
 .list-editor {
   display: flex;
