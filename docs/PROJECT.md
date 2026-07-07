@@ -33,15 +33,14 @@ childcare on some days — distinct from daycare.
 - Editable from a phone (same web app, responsive) without touching the wall display.
 - Runs 24/7 on the Synology, survives reboots, updates on its own.
 
-## Hardware / display stack (decided in prior session)
+## Hardware / display stack (updated 2026-07-07)
 - **Content:** web page hosted on the **Synology NAS** (Docker), shown in a fullscreen
   browser. Decouples content from hardware; maximizes LLM/vibe-code leverage.
-- **Display + processor:** **wall-mounted landscape Android tablet** running **Fully Kiosk
-  Browser** pointed at the NAS URL. The tablet is display + processor in one. Mitigate
-  battery wear with a smart plug charging to ~80%.
-- **Alternative:** LCD monitor + Raspberry Pi in Chromium kiosk mode (bigger screen, more setup).
+- **Display:** **monitor driven by a Raspberry Pi 4B (4GB)** running Chromium in kiosk mode
+  pointed at the NAS URL. Bigger screen than a tablet; Pi is processor, monitor is display.
 - **Rejected for this use case:** e-paper (bad at dense/frequently-updating color content)
-  and ESP32 (can't run a browser; fights vibe-coding).
+  and ESP32 (can't run a browser; fights vibe-coding). Android tablet + Fully Kiosk was the
+  original plan but dropped in favor of a bigger monitor.
 - **Home Assistant:** not the display layer. Optional later as a *data aggregator* only.
 
 See `docs/DECISIONS.md` for the full rationale behind each choice.

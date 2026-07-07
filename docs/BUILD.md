@@ -5,7 +5,7 @@ Execute top-down. Each phase has acceptance criteria. Check items off and update
 
 ## Status
 **Phases 0–4 built + 5 post-v1 feature rounds, all verified locally (2026-07-07).**
-Remaining: Docker build test, Synology deploy, tablet setup (see checklist below).
+Remaining: Docker build test, Synology deploy, Pi + monitor kiosk setup (see checklist below).
 
 Notes from the build:
 - Local dev runs on **port 3210** (`PORT=3210 npm start`) — port 3000 is occupied by
@@ -33,7 +33,7 @@ Notes from the build:
 - [ ] `docker compose build` succeeds locally.
 - [ ] Copy to NAS, Container Manager project up, reachable at `http://<nas-ip>:3210`.
 - [ ] State + template survive container restart (bind-mounted `./data`).
-- [ ] Tablet: Fully Kiosk pointed at NAS URL, mounted, smart-plug charging.
+- [ ] Pi + monitor: Chromium kiosk mode pointed at NAS URL, mounted, autostart + nightly restart cron set up.
 - [ ] Real-hardware design review (row heights at 1080p, touch targets).
 
 ## Phase 0 — Scaffold ✅
@@ -70,9 +70,9 @@ Notes from the build:
 - [x] `Dockerfile` (node:22-alpine, `npm ci --omit=dev`).
 - [x] `docker-compose.yml` — host 3210 → 3000, bind-mount `./data` → `/app/server/data`,
       `TZ=Australia/Sydney`, `restart: always`.
-- [x] `README.md` — Synology Container Manager steps + Fully Kiosk Browser setup.
+- [x] `README.md` — Synology Container Manager steps + Pi/Chromium kiosk setup.
 - [ ] Docker image build tested.
-- [ ] Deployed on the NAS; state survives restart; tablet shows it fullscreen.
+- [ ] Deployed on the NAS; state survives restart; Pi + monitor shows it fullscreen.
 
 ## Phase 5 — Future / nice-to-have
 - [x] Per-week logistics **overrides** (one-off "Raya in City this Tue") — done, inline.

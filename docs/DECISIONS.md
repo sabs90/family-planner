@@ -107,3 +107,14 @@ Newest at bottom. Append with today's date when decisions are made or changed.
   Toggling it on outlines every editable cell (dashed accent) and makes chores cells open
   their editor on plain tap (chore toggling paused in edit mode). "✓ Done" exits. Direct
   interactions (tick chores, tap dinner/notes/people) still work outside edit mode.
+
+## 2026-07-07 — Display hardware changed: tablet → Pi + monitor
+- **Superseded:** the "Wall-mounted Android tablet + Fully Kiosk Browser" choice from the
+  first hardware decision above. Reason: user wants a bigger monitor than a tablet screen.
+- **Chosen:** dedicated **monitor driven by a Raspberry Pi 4B, 4GB RAM**, running Chromium
+  in kiosk mode pointed at the NAS URL. NAS still hosts the app via Docker (unchanged).
+- **RAM sizing:** 4GB over 2GB — Chromium running 24/7 in kiosk mode creeps in memory over
+  days/weeks; 2GB risks OOM kills. 8GB/16GB and Pi 5 are unnecessary for this lightweight,
+  low-animation dashboard.
+- **Mitigate kiosk memory creep:** nightly cron restart of Chromium (or the Pi), regardless
+  of RAM headroom.

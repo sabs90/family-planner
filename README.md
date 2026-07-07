@@ -2,8 +2,8 @@
 
 A wall-mounted **family weekly ops board**: who's working where, who's got which kid,
 who's doing drop-off/pickup, dinner + cook, evening activities, and checkable Sunday prep
-chores that reset each week. Served from a Synology NAS, displayed fullscreen on a
-wall-mounted landscape tablet, editable from a phone.
+chores that reset each week. Served from a Synology NAS, displayed fullscreen on a monitor
+driven by a Raspberry Pi in kiosk mode, editable from a phone.
 
 Docs live in [docs/](docs/) — start with [CLAUDE.md](CLAUDE.md) and [docs/PROJECT.md](docs/PROJECT.md).
 
@@ -36,19 +36,21 @@ To update after editing code: Container Manager → Project → family-planner �
 (or via SSH: `docker compose up -d --build` in the project folder).
 
 ### Give the NAS a fixed IP
-Set a DHCP reservation for the NAS in your router so the tablet's URL never breaks.
+Set a DHCP reservation for the NAS in your router so the wall display's URL never breaks.
 
-## Wall tablet setup (Fully Kiosk Browser)
+## Wall display setup (Raspberry Pi + monitor, Chromium kiosk)
 
-1. Install **Fully Kiosk Browser** (Play Store) on the Android tablet.
-2. Set **Start URL** to `http://<nas-ip>:3210/`.
-3. Recommended settings:
-   - **Device Management → Keep Screen On**: enabled (or use Fully's motion-detection
-     screensaver to blank at night and wake on motion).
-   - **Web Content → Autoplay/JS**: defaults are fine, no special permissions needed.
-   - **Kiosk mode**: optional, locks the tablet to the board.
-4. Mount landscape. Power via a smart plug on a schedule (e.g. charge to ~80%, off
-   overnight) to protect the battery.
+Recommended hardware: **Raspberry Pi 4B, 4GB RAM** — enough headroom for Chromium running
+24/7 without memory pressure; 2GB risks OOM over time, 8GB+/Pi 5 is unnecessary for a
+lightweight dashboard like this.
+
+1. Flash **Raspberry Pi OS** (with desktop) to an SD card, boot, connect to the monitor.
+2. Set Chromium to launch in kiosk mode pointed at `http://<nas-ip>:3210/`, e.g. via an
+   autostart entry: `chromium-browser --kiosk --noerrdialogs --disable-infobars http://<nas-ip>:3210/`.
+3. Disable screen blanking/DPMS so the monitor stays on (`xset s off`, `xset -dpms`).
+4. Set up a nightly `cron` restart of Chromium (or a full reboot) to clear any memory creep
+   from the long-running kiosk session.
+5. Mount monitor + Pi, landscape orientation.
 
 ## Phone editing
 

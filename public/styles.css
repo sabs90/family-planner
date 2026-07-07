@@ -77,7 +77,23 @@ body {
 
 .week-range { font-size: 1.05rem; color: var(--text-2); font-weight: 500; }
 
-.topbar-clock { display: flex; align-items: baseline; gap: 12px; }
+.current-weather { font-size: 1.05rem; color: var(--text-2); font-weight: 500; }
+
+.topbar-clock { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.prayer-widget {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 4px 12px;
+}
+.prayer-widget:empty { display: none; }
+.prayer-name { font-weight: 700; color: var(--text); }
+.prayer-remain { font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; }
 
 .clock {
   font-size: 1.7rem;

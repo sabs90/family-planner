@@ -10,6 +10,15 @@ const WEATHER_LAT = -33.92;
 const WEATHER_LON = 151.19;
 const WEATHER_TTL = 60 * 60 * 1000; // refetch hourly
 
+// Aladhan prayer times — Hanafi madhab (school=1, later Asr), Sydney. Method 3 =
+// Muslim World League; change if your local masjid follows a different convention.
+const PRAYER_METHOD = 3;
+const PRAYER_SCHOOL = 1;
+// 'sunrise' is not a prayer — it's the boundary where Fajr's window ends. Between
+// sunrise and Dhuhr no obligatory prayer is active (the traditional no-salah gap).
+const PRAYER_ORDER = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+const PRAYER_NAMES = { fajr: 'Fajr', sunrise: 'Sunrise', dhuhr: 'Dhuhr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha' };
+
 // ---------- state ----------
 let weekStart = null;       // 'YYYY-MM-DD' of this week's Sunday
 let TEMPLATE = [];          // the standing routine, from GET /api/template
@@ -17,6 +26,10 @@ let ACTIVITIES = [];        // reusable activity catalog (grows via "add new")
 let week = { meals: {}, tasks: {}, notes: '', dayNotes: {}, overrides: {} };
 let weather = {};           // dateIso → { icon, min, max, rain, hum }
 let weatherFetched = 0;
+let currentWeather = null;  // { icon, temp } for the header
+let prayerTimes = null;         // { fajr, dhuhr, asr, maghrib, isha } Date objects, today
+let prayerTomorrowFajr = null;  // Date — tomorrow's Fajr, for the post-Isha countdown
+let prayerFetchedDate = null;   // 'YYYY-MM-DD' this cache belongs to
 let editing = false;        // true while an inline editor is open → pause re-render
 let editMode = false;       // header ✏️ toggle: highlight editables, tap-to-edit everywhere
 
@@ -127,10 +140,11 @@ async function fetchWeather() {
     const url = `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}` +
       `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,relative_humidity_2m_mean` +
+      `&current=temperature_2m,weather_code` +
       `&timezone=Australia%2FSydney&start_date=${weekStart}&end_date=${iso(dateOfDay(6))}`;
     const res = await fetch(url);
     if (!res.ok) return;
-    const { daily } = await res.json();
+    const { daily, current } = await res.json();
     weather = {};
     daily.time.forEach((d, i) => {
       weather[d] = {
@@ -141,8 +155,64 @@ async function fetchWeather() {
         hum: Math.round(daily.relative_humidity_2m_mean[i]),
       };
     });
+    if (current) {
+      currentWeather = { icon: weatherIcon(current.weather_code), temp: Math.round(current.temperature_2m) };
+    }
     weatherFetched = Date.now();
   } catch { /* offline / API down → just no weather line */ }
+}
+
+// ---------- prayer times (Aladhan, Hanafi Asr) ----------
+async function fetchAladhanTimings(date) {
+  const url = `https://api.aladhan.com/v1/timings/${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}` +
+    `?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}` +
+    `&method=${PRAYER_METHOD}&school=${PRAYER_SCHOOL}&timezonestring=Australia/Sydney`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const { data } = await res.json();
+  return data.timings;
+}
+
+function parseAladhanTime(dateBase, hhmm) {
+  const [h, m] = hhmm.split(' ')[0].split(':').map(Number);
+  const d = new Date(dateBase);
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+async function fetchPrayerTimes() {
+  const today = new Date();
+  const todayIso = iso(today);
+  if (prayerFetchedDate === todayIso) return;
+  try {
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const [todayT, tomorrowT] = await Promise.all([
+      fetchAladhanTimings(today),
+      fetchAladhanTimings(tomorrow),
+    ]);
+    if (!todayT) return;
+    prayerTimes = {};
+    for (const key of PRAYER_ORDER) {
+      prayerTimes[key] = parseAladhanTime(today, todayT[PRAYER_NAMES[key]]);
+    }
+    prayerTomorrowFajr = tomorrowT ? parseAladhanTime(tomorrow, tomorrowT.Fajr) : null;
+    prayerFetchedDate = todayIso;
+  } catch { /* offline / API down → widget just stays empty */ }
+}
+
+// Which of the 5 obligatory prayers' window we're currently in, and when that
+// window ends (i.e. the next prayer's start time).
+function currentPrayer() {
+  if (!prayerTimes) return null;
+  const now = new Date();
+  let idx = -1;
+  for (let i = 0; i < PRAYER_ORDER.length; i++) {
+    if (prayerTimes[PRAYER_ORDER[i]] <= now) idx = i;
+  }
+  if (idx === -1) return { name: 'Isha', next: prayerTimes.fajr }; // still last night's Isha window
+  const next = idx < PRAYER_ORDER.length - 1 ? prayerTimes[PRAYER_ORDER[idx + 1]] : prayerTomorrowFajr;
+  return { name: PRAYER_NAMES[PRAYER_ORDER[idx]], next };
 }
 
 // ---------- DOM helpers ----------
@@ -169,6 +239,27 @@ function renderHeader() {
   const start = dateOfDay(0), end = dateOfDay(6);
   const fmt = (d) => d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
   document.getElementById('week-range').textContent = `${fmt(start)} – ${fmt(end)}`;
+
+  document.getElementById('current-weather').textContent =
+    currentWeather ? `${currentWeather.icon} ${currentWeather.temp}°` : '';
+
+  renderPrayer();
+}
+
+// ---------- render: prayer widget ----------
+function renderPrayer() {
+  const node = document.getElementById('prayer-widget');
+  if (!node) return;
+  const cur = currentPrayer();
+  node.textContent = '';
+  if (!cur || !cur.next) return; // no data yet (offline / still loading)
+  const msLeft = cur.next - new Date();
+  if (msLeft <= 0) return; // just rolled over; next tick/poll will refresh
+  const totalMin = Math.floor(msLeft / 60_000);
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  const remain = h > 0 ? `${h}h ${m}m` : `${m}m`;
+  const icon = cur.name === 'Sunrise' ? '🌅' : '🕌';
+  node.append(el('span', 'prayer-name', `${icon} ${cur.name}`), el('span', 'prayer-remain', `${remain} left`));
 }
 
 // ---------- render: weekly notes strip ----------
@@ -802,7 +893,7 @@ async function refresh() {
   weekStart = ws;
   // Don't refetch the template mid-edit: open editors hold live references into
   // TEMPLATE, and replacing it would silently orphan their changes.
-  await Promise.all([fetchWeek(), editing ? null : fetchTemplate(), fetchWeather()]);
+  await Promise.all([fetchWeek(), editing ? null : fetchTemplate(), fetchWeather(), fetchPrayerTimes()]);
   renderHeader();
   renderNotes();
   renderBoard();

@@ -111,5 +111,6 @@ env in docker-compose.
 1. Build image from `Dockerfile` (Node LTS base, copy app, `npm ci --omit=dev`, `CMD node server/server.js`).
 2. In Container Manager: create container, map host port → 3000, bind-mount a host folder
    to `/app/server/data`, set `TZ=Australia/Sydney`, restart policy = always.
-3. Point Fully Kiosk Browser on the tablet at `http://<nas-ip>:<port>/`.
+3. Point Chromium kiosk mode on the Raspberry Pi (driving the wall monitor) at
+   `http://<nas-ip>:<port>/`.
 Full step-by-step goes in `README.md` when built.

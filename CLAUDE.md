@@ -6,8 +6,8 @@ Entry point for Claude in this repo. Read this first, then the docs it points to
 A wall-mounted **family logistics / weekly ops board** for the Hus(?) family. Not a
 calendar — the point is to make *"who's got which kid, where is everyone working, and
 who's doing drop-off/pickup"* glanceable, plus meals and weekly prep chores. Runs as a
-locally-hosted web page on a Synology NAS, displayed fullscreen on a wall-mounted
-landscape device, and editable from a phone.
+locally-hosted web page on a Synology NAS, displayed fullscreen on a monitor driven by a
+Raspberry Pi in kiosk mode, and editable from a phone.
 
 ## Status
 **v1 feature-complete, verified locally, 2026-07-07** — after 5 design-review rounds with
@@ -19,7 +19,7 @@ Run locally: `PORT=3210 npm start` → http://localhost:3210 (port 3000 is taken
 on the dev machine). A dev server may still be running from the last session.
 
 **Remaining (next session):** Docker build test → Synology deploy (README has the steps) →
-tablet + Fully Kiosk setup → review on real hardware. Optional: settings-page polish, SSE.
+Pi + monitor kiosk setup → review on real hardware. Optional: settings-page polish, SSE.
 
 ## Doc index
 - `docs/PROJECT.md` — goal, why, family context, hardware stack, success criteria.
@@ -33,7 +33,7 @@ tablet + Fully Kiosk setup → review on real hardware. Optional: settings-page 
 - Frontend: vanilla HTML/CSS/JS single page (no framework). Landscape, 7 day columns.
 - Backend: Node/Express + **JSON file store** (not SQLite — avoids native builds on Synology).
 - Deploy: one Docker container via Synology Container Manager.
-- Display: wall-mounted landscape Android tablet running Fully Kiosk Browser → NAS URL.
+- Display: monitor driven by a Raspberry Pi 4B (4GB) running Chromium kiosk mode → NAS URL.
 
 ## How to work in this repo
 - **Three data tiers — keep the split:**
