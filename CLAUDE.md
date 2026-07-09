@@ -10,16 +10,23 @@ locally-hosted web page on a Synology NAS, displayed fullscreen on a monitor dri
 Raspberry Pi in kiosk mode, and editable from a phone.
 
 ## Status
-**v1 feature-complete, verified locally, 2026-07-07** — after 5 design-review rounds with
-the user (see `docs/DECISIONS.md`). Board + full editing story are done: label-rail grid,
-weather, per-day/weekly notes, theme switch, in-app routine editing (inline cell editors
-with this-week/every-week scope, ✏️ edit mode, ⚙️ settings page, activity catalog).
+**v1 feature-complete + post-v1 header/calendar round, verified locally, 2026-07-09** — see
+`docs/DECISIONS.md` for the full history. Board + full editing story are done: label-rail
+grid, weather, per-day/weekly notes, theme switch, in-app routine editing (inline cell
+editors with this-week/every-week scope, ✏️ edit mode, ⚙️ settings page, activity catalog).
+
+Since v1: topbar now carries current weather + a Hanafi-madhab Sydney prayer widget (two
+views — countdown or all-5 — toggled on the settings page), kid drop-off/pickup can be set
+to two different parents, daycare's chip color moved from red to amber, role subtitles
+dropped from the label rail, and a **Calendar row** reads a family Google Calendar (secret
+iCal address, configured and confirmed working against the real calendar).
 
 Run locally: `PORT=3210 npm start` → http://localhost:3210 (port 3000 is taken by Finboard
 on the dev machine). A dev server may still be running from the last session.
 
 **Remaining (next session):** Docker build test → Synology deploy (README has the steps) →
-Pi + monitor kiosk setup → review on real hardware. Optional: settings-page polish, SSE.
+Pi + monitor kiosk setup → review on real hardware. Optional: settings-page polish, SSE,
+multi-calendar support if events live across more than one Google Calendar.
 
 ## Doc index
 - `docs/PROJECT.md` — goal, why, family context, hardware stack, success criteria.
@@ -32,6 +39,7 @@ Pi + monitor kiosk setup → review on real hardware. Optional: settings-page po
 ## Tech stack (decided)
 - Frontend: vanilla HTML/CSS/JS single page (no framework). Landscape, 7 day columns.
 - Backend: Node/Express + **JSON file store** (not SQLite — avoids native builds on Synology).
+  Plus `node-ical` (pure JS) for the family Google Calendar feed.
 - Deploy: one Docker container via Synology Container Manager.
 - Display: monitor driven by a Raspberry Pi 4B (4GB) running Chromium kiosk mode → NAS URL.
 
@@ -40,14 +48,19 @@ Pi + monitor kiosk setup → review on real hardware. Optional: settings-page po
   1. `public/config.js` — static: people, locations, colors (change = redeploy).
   2. Routine template — server-stored (`server/data/template.json`, seeded from
      `server/default-template.js`), edited in-app via `GET/PUT /api/template`.
-     Routine changes need **no container rebuild**.
+     Routine changes need **no container rebuild**. Also carries small display prefs
+     (`settings.prayerView`), set from the settings page.
   3. Weekly dynamic state — `server/data/state.json` keyed by week-start (Sunday):
      meals, chore ticks, notes, dayNotes, and this-week **overrides** (auto-expire at
      rollover; `"__reset__"` sentinel clears one).
+  4. Calendar secret (`server/data/calendar-config.json`, gitignored, created manually —
+     see README): `{ icsUrl }` for the family Google Calendar. Never sent to the client;
+     only parsed event titles/times are, via `GET /api/calendar/:weekStart`.
 - Week starts **Sunday** (Sunday prep kicks off the week). Column order is Sun→Sat.
 - Editors hold live references into the client's TEMPLATE — never refetch the template
   while `editing` is true.
-- Keep it vibe-code-friendly and simple: readable vanilla code, Express is the only dep.
+- Keep it vibe-code-friendly and simple: readable vanilla code, minimal deps (Express +
+  `node-ical` for the calendar feed).
 
 ## ⚑ "end session" trigger
 When the user says **"end session"** (or "end the session"), treat it as a signal to

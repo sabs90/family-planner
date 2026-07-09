@@ -118,3 +118,52 @@ Newest at bottom. Append with today's date when decisions are made or changed.
   low-animation dashboard.
 - **Mitigate kiosk memory creep:** nightly cron restart of Chromium (or the Pi), regardless
   of RAM headroom.
+
+## 2026-07-09 — Header rework: prayer widget, weather, calendar row
+- **Prayer widget gets two views**, toggled on the settings page and persisted server-side
+  in `template.settings.prayerView` (`'countdown'` default, or `'all'`): the existing
+  current-prayer + countdown pill, or a row of all 5 prayers with the current one bolded.
+  Both views show **Sunrise as its own entry** (not a prayer) so Fajr's window visibly ends
+  there instead of silently running into Dhuhr.
+- **Prayer widget moved out of the topbar** into its own full-width strip (like the notes
+  strip) below the header — the "all 5" view needs more horizontal room than the topbar's
+  button row has to spare.
+- **Removed the "5 – 11 July" week-range text** from the header (redundant — each day
+  column already shows its date) and **swapped clock/date order** so the live clock is the
+  rightmost element.
+- **Calendar row added**, reading a family Google Calendar via its **secret iCal address**
+  (Settings → Integrate calendar) rather than full OAuth — no Google Cloud project, no
+  token refresh, fits this app's "keep it simple" ethos. Recurring events are expanded
+  server-side with the `node-ical` package (the project's second dependency; still no
+  native builds). The URL lives in `server/data/calendar-config.json` (gitignored, created
+  manually, never sent to the client — only parsed event titles/times are).
+- **Found and fixed a latent robustness bug** while testing this: `fetchWeather`/
+  `fetchPrayerTimes` had no request timeout, so a hung external API blocked the entire
+  `Promise.all` in `refresh()` — the *whole board*, not just the weather/prayer widgets,
+  would fail to render. Added an 8s `AbortController` timeout on all three external-facing
+  client fetches (weather, prayer, calendar) and a 10s one on the server's ICS fetch, so a
+  slow/dead third-party API degrades gracefully instead of blanking the wall display.
+
+## 2026-07-09 — Header rework, continued (same day)
+- **Superseded the full-width prayer strip above**: moved the prayer widget back *into*
+  the topbar (centered, between the title and the clock/buttons), because vertical height
+  is scarce on a 1080p wall display — a whole extra row for one widget wasn't worth it.
+  The topbar is now a 3-part flex row (title / prayer / clock+buttons) so both the
+  countdown pill and the all-5 tile row fit on a single line.
+- **Emojis dropped from the prayer widget and calendar chips** (🕌/🌅/🗓️) — plain text
+  reads cleaner at this density and the labels (Fajr, Sunrise, event titles) are
+  self-explanatory without them.
+- **Prayer times in 12-hour format**, no leading zero (`7:00am`, not `07:00`) — matches
+  how the family actually reads a clock, unlike the 24h wall clock which stays as-is.
+- **Individual drop-off/pickup**: the person editor (board + settings page) now has
+  separate Drop and Pick selects instead of one combined "drop + pick" select. Same value
+  in both collapses to the existing `dp` field (one combined chip); different values use
+  the existing `drop`/`pick` fields (two chips) — the data model already supported the
+  split, only the editor UI was missing it.
+- **Daycare color: red → amber/gold** (softer, less alarming for a location indicator).
+  Split a dedicated `--c-danger` variable out for the delete-button hover state, which had
+  been incidentally reusing the old red daycare color for an unrelated "danger" affordance.
+- **Role subtitles removed** from the label rail (dad/mum/3yo/8mo) — "we know who we are".
+- **Google Calendar configured and verified live** against the real family calendar (not
+  just a test feed) — the Calendar row now shows real events (e.g. "Finance Night",
+  recurring weekly; "Raka's", timed; "Cancel chessable", all-day) correctly placed by date.

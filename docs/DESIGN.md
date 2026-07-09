@@ -9,14 +9,19 @@ Blend the best of the genre:
 Goal aesthetic: a **premium, calm family display** — not a spreadsheet. Big type, generous
 spacing, color used meaningfully (person identity + drop-off/pickup ownership).
 
-## Layout — landscape grid: label rail + days as columns (updated 2026-07-07)
-- **Header bar:** title, live date + clock, current week range (e.g. "5–11 Jul"). Subtle.
+## Layout — landscape grid: label rail + days as columns (updated 2026-07-09)
+- **Header bar (single line, vertical height is precious at 1080p):** title + current
+  conditions (icon + °) on the left; a centered **prayer widget** (Hanafi madhab, Sydney —
+  either "current prayer + countdown" or all 5 prayers with the current one bolded, toggled
+  on the settings page); ✏️ Edit / ⚙️ settings / theme buttons + today's date + live clock on
+  the right. No week-range text — every day column already shows its own date.
 - The board is **one grid card**: a fixed **left label rail** (~96px) naming each row once,
   then **7 day columns** Sun → Sat. Rationale: names/categories were repeated in every
   column and cluttered the board — the rail declutters it.
 - **Rows (top → bottom):** day header (with weather) · Sabeeh · Raya · Illy · Ismail ·
-  Dinner · Activities · Chores. Person rows show a color dot + short name (+ role for
-  clarity) in the rail; day cells contain only chips, no names.
+  Dinner · Activities · **Calendar** · Chores · Notes. Person rows show just a color dot +
+  short name in the rail (role subtitles like "dad"/"3yo" were dropped — the family knows
+  who's who); day cells contain only chips, no names.
 - **Today's column** tints top-to-bottom, header cell solid accent. Past columns dimmed.
   Highlight recomputes each minute so it advances at midnight.
 - **Weather** per day in the header cell: condition emoji + `min°–max°` (Open-Meteo,
@@ -27,14 +32,18 @@ spacing, color used meaningfully (person identity + drop-off/pickup ownership).
 1. **Parent cells** — work-location chip (City / WFH / Parramatta), or activity chip on
    weekends (Raya Sat pilates), else "—".
 2. **Kid cells** — care-location chip + a **D/P chip** in the responsible parent's color
-   ("Raya · drop + pick"). One combined chip when drop == pick; split into two if they differ.
-   **Daycare and Mascot location chips are color-tinted** (rose / green) so care location
+   ("Raya · drop + pick"). One combined chip when drop == pick; split into two if they
+   differ — the person editor has independent Drop / Pick selects, so a family can freely
+   split the two roles across parents (not just "one parent does both").
+   **Daycare and Mascot location chips are color-tinted** (amber / green) so care location
    pops at a glance; other locations stay neutral.
 3. **Dinner cells** — dish text + cook chip in the cook's color. Editable. Wed = fixed
    "Dinner at grandparents'" (no cook).
 4. **Activities cells** — chips: pilates (Raya color), futsal (Sab color), family dinner and
    Sat "Family fun adventure day" (neutral).
-5. **Chores cells** — checkable items (Sun prep + groceries; Thu bins/fridge; Fri laundry/
+5. **Calendar cells** — read-only chips for that day's events from the family Google
+   Calendar (title + time, no icon — kept plain to avoid clutter); "—" when nothing's on.
+6. **Chores cells** — checkable items (Sun prep + groceries; Thu bins/fridge; Fri laundry/
    tidy/toilets/vacuum/meal plan; Sat laundry/study). Checked = struck through / muted.
    State persists per week and resets weekly.
 
@@ -76,7 +85,9 @@ Keep one visual language; don't mix heavy emoji with line icons.
   for non-technical users — everything it reaches also works without it.
 - **Header buttons:** ✏️ Edit · ⚙️ routine settings page · 🌗/☀️/🌙 theme cycle.
 - **Settings page (`/settings.html`):** full routine forms per day (people incl. custom
-  activities, fixed dinner, activities/chores lists). Save → wall syncs within a poll.
+  activities, fixed dinner, activities/chores lists — each kid row has independent Drop /
+  Pick selects), plus a **Display** card for the prayer widget view (countdown vs all 5),
+  saved immediately on change. Save → wall syncs within a poll.
 - **Phone (≤900px):** stacked day cards, past days hidden, all editors work the same.
 - Optimistic updates: reflect immediately, then PATCH/PUT; poll reconciles (~20s).
 - While any editor is open, re-renders and template refetches pause (`editing` flag).

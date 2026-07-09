@@ -4,7 +4,7 @@ Execute top-down. Each phase has acceptance criteria. Check items off and update
 "end session".
 
 ## Status
-**Phases 0–4 built + 5 post-v1 feature rounds, all verified locally (2026-07-07).**
+**Phases 0–4 built + 6 post-v1 feature rounds, all verified locally (2026-07-09).**
 Remaining: Docker build test, Synology deploy, Pi + monitor kiosk setup (see checklist below).
 
 Notes from the build:
@@ -28,6 +28,27 @@ Notes from the build:
 - [x] Inline activities editor (person + catalog dropdowns, "new activity" grows catalog)
       and chores editor (add/remove with ✕); + buttons removed → tap activities /
       long-press chores / **✏️ Edit mode** toggle that outlines all editables.
+
+## Post-v1 feature round 2 (all done 2026-07-09, user-driven; details in DECISIONS.md)
+- [x] Role subtitles ("dad"/"3yo") removed from the label rail.
+- [x] Kid drop-off/pickup editable independently (Drop + Pick selects, board and settings
+      page both) — not just one parent doing both.
+- [x] Daycare chip color: red → amber/gold; delete-button hover split into its own
+      `--c-danger` var so it's no longer coupled to the daycare color choice.
+- [x] Header current-weather + Hanafi-madhab Sydney **prayer widget**, two views
+      (current-prayer countdown, or all 5 with the current one bolded), toggled on the
+      settings page and persisted in `template.settings.prayerView`. Sunrise shown as its
+      own entry so Fajr's window is seen ending there, not silently running into Dhuhr.
+      12-hour times, no leading zero, no emoji. Lives inline in the topbar (not a separate
+      strip — vertical height is scarce at 1080p).
+- [x] Removed the week-range header text (redundant with per-day dates); swapped
+      clock/date order so the clock is rightmost.
+- [x] **Calendar row**: reads a family Google Calendar via its secret iCal address (no
+      OAuth), recurring events expanded server-side with `node-ical`. Configured and
+      confirmed working against the real family calendar.
+- [x] Fixed a robustness bug found while testing the above: `fetchWeather`/
+      `fetchPrayerTimes` had no timeout, so a hung external API blocked the *entire* board
+      from rendering. Added client + server-side fetch timeouts.
 
 ## Deploy checklist (next session)
 - [ ] `docker compose build` succeeds locally.
@@ -76,14 +97,18 @@ Notes from the build:
 
 ## Phase 5 — Future / nice-to-have
 - [x] Per-week logistics **overrides** (one-off "Raya in City this Tue") — done, inline.
-- [x] Weather strip — done (Open-Meteo per-day).
+- [x] Weather strip — done (Open-Meteo per-day, plus current conditions in the header).
+- [x] Google Calendar feed as a data source — done (secret iCal address, see above).
 - [ ] SSE for instant cross-device updates (replace polling).
-- [ ] Optional Home Assistant / Google Calendar feed as a data source.
+- [ ] Multi-calendar support (merge more than one iCal feed) if events end up scattered
+      across separate personal calendars rather than one shared family calendar.
+- [ ] Optional Home Assistant integration as a data aggregator.
 - [ ] "Next up" indicator, week-over-week chore completion stats.
 - [ ] Settings-page visual polish (functional but plain).
 - [ ] `?readonly=1` mode for the wall URL if stray taps become a problem.
 
 ## Build conventions
-- Keep deps minimal (Express + maybe nothing else). No build step for the frontend.
+- Keep deps minimal (Express + `node-ical` for the calendar feed). No build step for the
+  frontend.
 - Follow the data split in `docs/ARCHITECTURE.md` — template static, dynamic via API.
 - Colors/layout per `docs/DESIGN.md`; routine per `docs/SCHEDULE.md` (source of truth).

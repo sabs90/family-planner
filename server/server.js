@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getWeek, patchWeek, getTemplate, putTemplate } from './store.js';
+import { getWeekEvents } from './calendar.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,6 +38,16 @@ app.patch('/api/week/:weekStart', (req, res) => {
     return res.status(400).json({ error: 'bad body' });
   }
   res.json(patchWeek(weekStart, req.body));
+});
+
+app.get('/api/calendar/:weekStart', async (req, res) => {
+  const { weekStart } = req.params;
+  if (!WEEK_RE.test(weekStart)) return res.status(400).json({ error: 'bad weekStart' });
+  try {
+    res.json({ events: await getWeekEvents(weekStart) });
+  } catch {
+    res.json({ events: [] }); // feed unreachable → board just shows no calendar row
+  }
 });
 
 app.listen(PORT, () => {

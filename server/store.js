@@ -29,6 +29,7 @@ const state = loadJson(STATE_FILE, { weeks: {} });
 // Routine template: seeded from default-template.js until first saved edit.
 let template = loadJson(TEMPLATE_FILE, { week: DEFAULT_WEEK, activities: DEFAULT_ACTIVITIES });
 template.activities ??= DEFAULT_ACTIVITIES; // template.json saved before the catalog existed
+template.settings ??= { prayerView: 'countdown' }; // template.json saved before settings existed
 
 // ---------- template (the standing routine) ----------
 export function getTemplate() {
@@ -53,7 +54,11 @@ export function putTemplate(next) {
   const activities = Array.isArray(next.activities)
     ? next.activities.filter((a) => a && typeof a.label === 'string' && a.label.trim())
     : template.activities;
-  template = { week: next.week, activities };
+  // Display settings: same preserve-if-omitted rule as activities.
+  const settings = next.settings && typeof next.settings === 'object'
+    ? { prayerView: next.settings.prayerView === 'all' ? 'all' : 'countdown' }
+    : template.settings;
+  template = { week: next.week, activities, settings };
   saveJson(TEMPLATE_FILE, template);
   return template;
 }

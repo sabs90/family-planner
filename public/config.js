@@ -3,10 +3,10 @@
 // server/default-template.js, human-readable doc in docs/SCHEDULE.md.
 
 export const FAMILY = {
-  sabeeh: { name: 'Sabeeh', short: 'Sab', role: 'dad' },
-  raya:   { name: 'Raya',   short: 'Raya', role: 'mum' },
-  illy:   { name: 'Illy',   short: 'Illy', role: '3yo' },
-  ismail: { name: 'Ismail', short: 'Ismail', role: '8mo' },
+  sabeeh: { name: 'Sabeeh', short: 'Sab' },
+  raya:   { name: 'Raya',   short: 'Raya' },
+  illy:   { name: 'Illy',   short: 'Illy' },
+  ismail: { name: 'Ismail', short: 'Ismail' },
 };
 
 export const PARENTS = ['sabeeh', 'raya'];

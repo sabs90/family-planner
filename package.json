@@ -8,6 +8,7 @@
     "start": "node server/server.js"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "node-ical": "^0.26.1"
   }
 }

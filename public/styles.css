@@ -9,8 +9,9 @@
   --c-ismail: #f59e0b;
 
   /* Location colors — daycare vs grandparents' (Mascot) at a glance */
-  --c-daycare: #e11d48;
+  --c-daycare: #d97706;
   --c-mascot:  #16a34a;
+  --c-danger:  #e11d48;
 
   --bg: #f4f2ee;
   --surface: #ffffff;
@@ -29,8 +30,9 @@ html[data-theme="dark"] {
   --c-illy:   #2dd4bf;
   --c-ismail: #fbbf24;
 
-  --c-daycare: #fb7185;
+  --c-daycare: #fcd34d;
   --c-mascot:  #4ade80;
+  --c-danger:  #fb7185;
 
   --bg: #14161c;
   --surface: #1d2027;
@@ -65,9 +67,10 @@ body {
   align-items: baseline;
   justify-content: space-between;
   padding: 0 4px;
+  gap: 12px;
 }
 
-.topbar-title { display: flex; align-items: baseline; gap: 14px; }
+.topbar-title { display: flex; align-items: baseline; gap: 14px; flex: none; }
 
 .topbar h1 {
   font-size: 1.7rem;
@@ -75,25 +78,9 @@ body {
   letter-spacing: -0.02em;
 }
 
-.week-range { font-size: 1.05rem; color: var(--text-2); font-weight: 500; }
-
 .current-weather { font-size: 1.05rem; color: var(--text-2); font-weight: 500; }
 
-.topbar-clock { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-
-.prayer-widget {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 0.9rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 99px;
-  padding: 4px 12px;
-}
-.prayer-widget:empty { display: none; }
-.prayer-name { font-weight: 700; color: var(--text); }
-.prayer-remain { font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.topbar-clock { display: flex; align-items: center; gap: 12px; flex: none; }
 
 .clock {
   font-size: 1.7rem;
@@ -143,6 +130,45 @@ body.edit-mode .notes-strip {
   text-decoration: none;
 }
 .back-link:hover { color: var(--text); }
+
+/* ---------- Prayer strip (inline in the topbar — no spare vertical row) ---------- */
+.prayer-strip {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.prayer-strip:empty { display: none; }
+
+.prayer-name { font-weight: 700; color: var(--text); font-size: 1.05rem; }
+.prayer-remain {
+  font-weight: 500;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.05rem;
+  margin-left: 6px;
+}
+
+.prayer-tiles { display: flex; align-items: baseline; gap: 14px; }
+
+.p-tile {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 0.85rem;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.p-tile .p-name { font-weight: 600; color: var(--text-2); }
+.p-tile .p-time { font-variant-numeric: tabular-nums; }
+.p-tile.current .p-name { font-weight: 800; color: var(--accent); }
+.p-tile.current .p-time { color: var(--accent); font-weight: 700; }
+.p-tile.current .p-remain {
+  font-weight: 600;
+  color: var(--accent);
+}
 
 /* ---------- Notes strip ---------- */
 .notes-strip {
@@ -269,13 +295,6 @@ body.edit-mode .notes-strip {
   color: var(--text);
 }
 
-.label-role {
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: var(--text-3);
-  padding-left: 17px;
-}
-
 .cell.label.group {
   font-size: 0.62rem;
   font-weight: 800;
@@ -318,6 +337,21 @@ body.edit-mode .notes-strip {
 }
 
 .none { color: var(--text-3); font-size: 0.85rem; }
+
+/* Family Google Calendar events */
+.cal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+.cal-chip .sub { font-weight: 500; color: var(--text-3); font-size: 0.75rem; }
 
 /* D/P ownership chip — the most important element on the board */
 .dp-chip {
@@ -479,6 +513,9 @@ body.edit-mode .notes-strip {
   width: 100%;
 }
 
+.dp-row { display: flex; gap: 6px; }
+.dp-row select { flex: 1; min-width: 0; }
+
 .scope-toggle {
   display: flex;
   gap: 4px;
@@ -638,6 +675,8 @@ body.edit-mode .notes-strip {
 /* ---------- Settings page ---------- */
 .settings-page { height: auto; min-height: 100%; }
 
+.display-settings { max-width: 340px; margin-bottom: 12px; }
+
 .settings-days {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
@@ -682,7 +721,8 @@ body.edit-mode .notes-strip {
 
 .set-row select,
 .set-row input,
-.set-block > input {
+.set-block > input,
+.set-block > select {
   font: inherit;
   font-size: 0.82rem;
   color: var(--text);
@@ -708,7 +748,7 @@ body.edit-mode .notes-strip {
   cursor: pointer;
   padding: 4px;
 }
-.rm-btn:hover { color: var(--c-daycare); }
+.rm-btn:hover { color: var(--c-danger); }
 
 .add-btn {
   font: inherit;

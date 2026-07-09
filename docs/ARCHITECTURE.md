@@ -3,7 +3,8 @@
 ## Stack
 - **Frontend:** vanilla HTML/CSS/JS single page. No framework, no build step. Easy to host
   on Synology and easy to vibe-edit.
-- **Backend:** Node.js + Express. Serves the static frontend and a small REST API.
+- **Backend:** Node.js + Express. Serves the static frontend and a small REST API. One
+  extra dependency, `node-ical` (pure JS, no native builds), for the calendar feed below.
 - **Persistence:** a single JSON file on disk (`server/data/state.json`), written
   atomically (write temp + rename). Deliberately **not** SQLite — no native modules to
   compile on Synology's platform. Data volume is tiny (one family).
@@ -13,11 +14,14 @@
 ## Data split (updated 2026-07-07: template is now editable in-app)
 - **Static (`public/config.js`):** family members + roles, locations + colors, editor
   location lists. Changes here still mean a redeploy (rare).
-- **Routine template (server-stored, `server/data/template.json`):** the standing weekly
-  schedule — work locations, kid care + drop-off/pickup, activities, chores, fixed meals.
-  Seeded from `server/default-template.js` on first boot; edited via the **settings page**
-  (`/settings.html`) or inline on the board with scope "Every week". **No container rebuild
-  needed to change the routine.**
+- **Routine template (server-stored, `server/data/template.json`):** `{ week, activities,
+  settings }`. `week`/`activities` are the standing weekly schedule — work locations, kid
+  care + drop-off/pickup, activities, chores, fixed meals — seeded from
+  `server/default-template.js` on first boot; edited via the **settings page**
+  (`/settings.html`) or inline on the board with scope "Every week". `settings` holds small
+  display prefs (currently just `{ prayerView: 'countdown' | 'all' }`, toggled on the
+  settings page); each of the three top-level keys is preserved if a PUT omits it. **No
+  container rebuild needed to change any of this.**
 - **Dynamic (server-stored, keyed by week):** meals + cook, chore/task completion, weekly
   notes, per-day notes, and **this-week-only overrides** of the routine. Keyed by **week
   start (Sunday) ISO date** so each week is independent, **chores auto-reset**, and
@@ -29,23 +33,26 @@ family-planner/
 ├── CLAUDE.md
 ├── README.md                 # run + Synology/Fully Kiosk deploy guide
 ├── docs/                     # these docs
-├── package.json              # ESM; Express is the only dependency
+├── package.json              # ESM; Express + node-ical (calendar ICS parsing)
 ├── Dockerfile
 ├── docker-compose.yml        # host 3210 → 3000, ./data bind mount, TZ Sydney
 ├── .gitignore
 ├── server/
-│   ├── server.js             # Express: static + /api/week + /api/template
+│   ├── server.js             # Express: static + /api/week + /api/template + /api/calendar
 │   ├── store.js              # atomic JSON persistence, merges, validation
 │   ├── default-template.js   # seed routine + seed activity catalog
+│   ├── calendar.js           # family Google Calendar: fetch/parse/cache the ICS feed
+│   ├── calendar-config.example.json  # shape of calendar-config.json (tracked in git)
 │   └── data/                 # gitignored, bind-mounted in Docker
 │       ├── state.json        # weekly dynamic state
-│       └── template.json     # live routine (created on first in-app edit)
+│       ├── template.json     # live routine (created on first in-app edit)
+│       └── calendar-config.json  # { icsUrl } — secret, create manually, never committed
 └── public/
     ├── index.html            # the board
-    ├── settings.html         # routine editor page
+    ├── settings.html         # routine editor + display-prefs page
     ├── config.js             # FAMILY, LOCATIONS, editor location lists (static)
     ├── styles.css            # themes, grid, chips, editors, settings
-    ├── app.js                # render, poll, weather, all inline editors
+    ├── app.js                # render, poll, weather, prayer times, calendar, inline editors
     └── settings.js           # settings-page forms → PUT /api/template
 ```
 
@@ -92,6 +99,10 @@ prep-task definitions so ids are stable.
   - notes / dayNotes: `{ "notes": "..." }` / `{ "dayNotes": { "thursday": "..." } }`
   - this-week override: `{ "overrides": { "tuesday": { "parents": { "raya": { "loc": "city" } } } } }`
     (value `null` = nothing scheduled; string `"__reset__"` = remove override, back to routine)
+- `GET /api/calendar/:weekStart` → `{ events: [{ uid, title, date, time, allDay }] }` for
+  that week, read from the family Google Calendar's secret iCal address (see README).
+  Server-side cache, ~15 min TTL; returns `{ events: [] }` if unconfigured or unreachable —
+  never errors the board. The ICS URL itself is never exposed to the client.
 - (Static assets served from `public/`; board at `/`, routine editor at `/settings.html`.)
 
 `weekStart` is computed client-side from "today": most recent Sunday

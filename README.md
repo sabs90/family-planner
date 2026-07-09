@@ -63,3 +63,21 @@ strip to edit the week's notes. Changes appear on the wall within ~20 seconds.
 Edit [docs/SCHEDULE.md](docs/SCHEDULE.md) first (source of truth), then mirror the change in
 [public/config.js](public/config.js), rebuild the container. Day entries support split
 drop-off/pickup (`{ drop: 'raya', pick: 'sabeeh' }`) if the routine ever needs it.
+
+## Family Google Calendar (optional)
+
+The board's Calendar row reads events from a Google Calendar's **secret iCal address** —
+a private, read-only feed URL. No OAuth, no Google Cloud project, no login.
+
+1. In Google Calendar (web): **Settings → [pick the calendar] → Integrate calendar →
+   Secret address in iCal format**. Copy that URL.
+2. Create `server/data/calendar-config.json` (this whole directory is gitignored — the URL
+   is never committed and never sent to the browser, only the parsed event titles/times
+   are):
+   ```json
+   { "icsUrl": "https://calendar.google.com/calendar/ical/....../basic.ics" }
+   ```
+   (`server/calendar-config.example.json` has the exact shape.)
+3. Restart the server (or the container). The server polls the feed every ~15 minutes and
+   expands recurring events; if the feed is missing/unreachable the row just shows nothing
+   — the rest of the board is unaffected.

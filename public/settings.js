@@ -3,6 +3,7 @@
 import { FAMILY, PARENTS, KIDS, LOCATIONS, PARENT_LOCS, KID_LOCS } from './config.js';
 
 let week = null; // working copy of the template
+let settings = { prayerView: 'countdown' }; // display prefs, saved immediately on change
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -52,18 +53,29 @@ function personRow(day, group, id) {
     } else {
       day[group][id] = null;
     }
-    if (group === 'kids' && day[group][id]?.loc && dpSel.value) {
-      day[group][id].dp = dpSel.value;
+    if (group === 'kids' && day[group][id]?.loc) {
+      const dropV = dropSel.value, pickV = pickSel.value;
+      if (dropV && dropV === pickV) day[group][id].dp = dropV;
+      else {
+        if (dropV) day[group][id].drop = dropV;
+        if (pickV) day[group][id].pick = pickV;
+      }
     }
   };
 
-  let dpSel = null;
+  let dropSel = null, pickSel = null;
   if (group === 'kids') {
-    dpSel = document.createElement('select');
-    dpSel.append(new Option('D/P: —', ''));
-    for (const pid of PARENTS) dpSel.append(new Option(`D/P: ${FAMILY[pid].short}`, pid));
-    dpSel.value = entry?.dp || '';
-    dpSel.addEventListener('change', write);
+    dropSel = document.createElement('select');
+    dropSel.append(new Option('Drop: —', ''));
+    for (const pid of PARENTS) dropSel.append(new Option(`Drop: ${FAMILY[pid].short}`, pid));
+    dropSel.value = entry?.dp || entry?.drop || '';
+    dropSel.addEventListener('change', write);
+
+    pickSel = document.createElement('select');
+    pickSel.append(new Option('Pick: —', ''));
+    for (const pid of PARENTS) pickSel.append(new Option(`Pick: ${FAMILY[pid].short}`, pid));
+    pickSel.value = entry?.dp || entry?.pick || '';
+    pickSel.addEventListener('change', write);
   }
 
   locSel.addEventListener('change', () => { act.value = ''; write(); });
@@ -71,7 +83,7 @@ function personRow(day, group, id) {
   time.addEventListener('input', write);
 
   row.append(locSel);
-  if (dpSel) row.append(dpSel);
+  if (dropSel) row.append(dropSel, pickSel);
   row.append(act, time);
   return row;
 }
@@ -211,14 +223,18 @@ function cleanup() {
   }
 }
 
+async function putTemplate(body) {
+  return fetch('/api/template', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).catch(() => null);
+}
+
 async function save() {
   cleanup();
   const status = document.getElementById('save-status');
-  const res = await fetch('/api/template', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ week }),
-  }).catch(() => null);
+  const res = await putTemplate({ week, settings });
   if (res && res.ok) {
     status.textContent = '✓ Saved — the board updates within ~20s';
     setTimeout(() => { status.textContent = ''; }, 4000);
@@ -234,7 +250,17 @@ async function init() {
     : (new Date().getHours() >= 7 && new Date().getHours() < 19 ? 'light' : 'dark');
 
   const res = await fetch('/api/template');
-  week = (await res.json()).week;
+  const t = await res.json();
+  week = t.week;
+  settings = t.settings || { prayerView: 'countdown' };
+
+  const prayerViewSelect = document.getElementById('prayer-view-select');
+  prayerViewSelect.value = settings.prayerView;
+  prayerViewSelect.addEventListener('change', () => {
+    settings = { ...settings, prayerView: prayerViewSelect.value };
+    putTemplate({ week, settings });
+  });
+
   const days = document.getElementById('days');
   for (const day of week) days.append(renderDay(day));
   document.getElementById('save-btn').addEventListener('click', save);

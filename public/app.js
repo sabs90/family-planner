@@ -23,6 +23,7 @@ const PRAYER_NAMES = { fajr: 'Fajr', sunrise: 'Sunrise', dhuhr: 'Dhuhr', asr: 'A
 let weekStart = null;       // 'YYYY-MM-DD' of this week's Sunday
 let TEMPLATE = [];          // the standing routine, from GET /api/template
 let ACTIVITIES = [];        // reusable activity catalog (grows via "add new")
+let PRAYER_VIEW = 'countdown'; // 'countdown' | 'all' — from template.settings, set on settings page
 let week = { meals: {}, tasks: {}, notes: '', dayNotes: {}, overrides: {} };
 let weather = {};           // dateIso → { icon, min, max, rain, hum }
 let weatherFetched = 0;
@@ -30,10 +31,26 @@ let currentWeather = null;  // { icon, temp } for the header
 let prayerTimes = null;         // { fajr, dhuhr, asr, maghrib, isha } Date objects, today
 let prayerTomorrowFajr = null;  // Date — tomorrow's Fajr, for the post-Isha countdown
 let prayerFetchedDate = null;   // 'YYYY-MM-DD' this cache belongs to
+let CALENDAR = {};          // dateIso → [{ title, time, allDay }], from family Google Calendar
+let calendarFetched = 0;
+const CALENDAR_TTL = 15 * 60 * 1000; // matches the server-side cache TTL
 let editing = false;        // true while an inline editor is open → pause re-render
 let editMode = false;       // header ✏️ toggle: highlight editables, tap-to-edit everywhere
 
 const narrowMq = window.matchMedia('(max-width: 900px)');
+
+// A slow/hung external API (weather, prayer times) must never block the
+// core board (week/template) from rendering — refresh() awaits all of these
+// together, so each one needs its own hard ceiling.
+async function fetchWithTimeout(url, ms = 8000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
 
 // ---------- date helpers (all local / Sydney time) ----------
 const pad = (n) => String(n).padStart(2, '0');
@@ -92,7 +109,20 @@ async function fetchTemplate() {
     const t = await res.json();
     TEMPLATE = t.week;
     ACTIVITIES = t.activities || [];
+    PRAYER_VIEW = t.settings?.prayerView === 'all' ? 'all' : 'countdown';
   }
+}
+
+async function fetchCalendar() {
+  if (Date.now() - calendarFetched < CALENDAR_TTL) return;
+  try {
+    const res = await fetchWithTimeout(`/api/calendar/${weekStart}`);
+    if (!res.ok) return;
+    const { events } = await res.json();
+    CALENDAR = {};
+    for (const ev of events) (CALENDAR[ev.date] ??= []).push(ev);
+    calendarFetched = Date.now();
+  } catch { /* offline / feed unreachable → row just stays empty */ }
 }
 
 function patchWeek(patch) {
@@ -142,7 +172,7 @@ async function fetchWeather() {
       `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,relative_humidity_2m_mean` +
       `&current=temperature_2m,weather_code` +
       `&timezone=Australia%2FSydney&start_date=${weekStart}&end_date=${iso(dateOfDay(6))}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return;
     const { daily, current } = await res.json();
     weather = {};
@@ -167,7 +197,7 @@ async function fetchAladhanTimings(date) {
   const url = `https://api.aladhan.com/v1/timings/${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}` +
     `?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}` +
     `&method=${PRAYER_METHOD}&school=${PRAYER_SCHOOL}&timezonestring=Australia/Sydney`;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url);
   if (!res.ok) return null;
   const { data } = await res.json();
   return data.timings;
@@ -201,8 +231,8 @@ async function fetchPrayerTimes() {
   } catch { /* offline / API down → widget just stays empty */ }
 }
 
-// Which of the 5 obligatory prayers' window we're currently in, and when that
-// window ends (i.e. the next prayer's start time).
+// Which of the 5 obligatory prayers' window we're currently in (idx into
+// PRAYER_ORDER), and when that window ends (i.e. the next prayer's start time).
 function currentPrayer() {
   if (!prayerTimes) return null;
   const now = new Date();
@@ -210,9 +240,25 @@ function currentPrayer() {
   for (let i = 0; i < PRAYER_ORDER.length; i++) {
     if (prayerTimes[PRAYER_ORDER[i]] <= now) idx = i;
   }
-  if (idx === -1) return { name: 'Isha', next: prayerTimes.fajr }; // still last night's Isha window
+  if (idx === -1) {
+    // Before today's Fajr — still within last night's Isha window.
+    return { idx: PRAYER_ORDER.length - 1, name: 'Isha', next: prayerTimes.fajr };
+  }
   const next = idx < PRAYER_ORDER.length - 1 ? prayerTimes[PRAYER_ORDER[idx + 1]] : prayerTomorrowFajr;
-  return { name: PRAYER_NAMES[PRAYER_ORDER[idx]], next };
+  return { idx, name: PRAYER_NAMES[PRAYER_ORDER[idx]], next };
+}
+
+function remainLabel(msLeft) {
+  const totalMin = Math.floor(msLeft / 60_000);
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}m left` : `${m}m left`;
+}
+
+function fmtTime(d) {
+  const h24 = d.getHours();
+  const h12 = h24 % 12 || 12;
+  const ampm = h24 < 12 ? 'am' : 'pm';
+  return `${h12}:${pad(d.getMinutes())}${ampm}`;
 }
 
 // ---------- DOM helpers ----------
@@ -236,30 +282,50 @@ function renderHeader() {
   document.getElementById('today-label').textContent =
     now.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'short' });
 
-  const start = dateOfDay(0), end = dateOfDay(6);
-  const fmt = (d) => d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
-  document.getElementById('week-range').textContent = `${fmt(start)} – ${fmt(end)}`;
-
   document.getElementById('current-weather').textContent =
     currentWeather ? `${currentWeather.icon} ${currentWeather.temp}°` : '';
 
   renderPrayer();
 }
 
-// ---------- render: prayer widget ----------
+// ---------- render: prayer strip ----------
 function renderPrayer() {
-  const node = document.getElementById('prayer-widget');
+  const node = document.getElementById('prayer-strip');
   if (!node) return;
   const cur = currentPrayer();
   node.textContent = '';
-  if (!cur || !cur.next) return; // no data yet (offline / still loading)
+  if (!cur) return; // no data yet (offline / still loading)
+  if (PRAYER_VIEW === 'all') renderPrayerAll(node, cur);
+  else renderPrayerCountdown(node, cur);
+}
+
+function renderPrayerCountdown(node, cur) {
+  if (!cur.next) return;
   const msLeft = cur.next - new Date();
   if (msLeft <= 0) return; // just rolled over; next tick/poll will refresh
-  const totalMin = Math.floor(msLeft / 60_000);
-  const h = Math.floor(totalMin / 60), m = totalMin % 60;
-  const remain = h > 0 ? `${h}h ${m}m` : `${m}m`;
-  const icon = cur.name === 'Sunrise' ? '🌅' : '🕌';
-  node.append(el('span', 'prayer-name', `${icon} ${cur.name}`), el('span', 'prayer-remain', `${remain} left`));
+  node.append(
+    el('span', 'prayer-name', cur.name),
+    el('span', 'prayer-remain', remainLabel(msLeft)),
+  );
+}
+
+function renderPrayerAll(node, cur) {
+  const row = el('div', 'prayer-tiles');
+  const now = new Date();
+  PRAYER_ORDER.forEach((key, i) => {
+    const isCurrent = cur.idx === i;
+    const tile = el('div', `p-tile${isCurrent ? ' current' : ''}`);
+    tile.append(
+      el('span', 'p-name', PRAYER_NAMES[key]),
+      el('span', 'p-time', fmtTime(prayerTimes[key])),
+    );
+    if (isCurrent && cur.next) {
+      const msLeft = cur.next - now;
+      if (msLeft > 0) tile.append(el('span', 'p-remain', remainLabel(msLeft)));
+    }
+    row.append(tile);
+  });
+  node.append(row);
 }
 
 // ---------- render: weekly notes strip ----------
@@ -374,13 +440,21 @@ function openPersonEditor(container, day, group, id) {
   locSel.value = entry?.loc || '';
   form.append(locSel);
 
-  let dpSel = null;
+  let dropSel = null, pickSel = null;
   if (isKid) {
-    dpSel = document.createElement('select');
-    dpSel.append(new Option('Drop/pick: —', ''));
-    for (const pid of PARENTS) dpSel.append(new Option(`${FAMILY[pid].short} · drop + pick`, pid));
-    dpSel.value = entry?.dp || '';
-    form.append(dpSel);
+    const dpRow = el('div', 'dp-row');
+    dropSel = document.createElement('select');
+    dropSel.append(new Option('Drop: —', ''));
+    for (const pid of PARENTS) dropSel.append(new Option(`Drop: ${FAMILY[pid].short}`, pid));
+    dropSel.value = entry?.dp || entry?.drop || '';
+
+    pickSel = document.createElement('select');
+    pickSel.append(new Option('Pick: —', ''));
+    for (const pid of PARENTS) pickSel.append(new Option(`Pick: ${FAMILY[pid].short}`, pid));
+    pickSel.value = entry?.dp || entry?.pick || '';
+
+    dpRow.append(dropSel, pickSel);
+    form.append(dpRow);
   }
 
   // Scope: one-off override vs standing routine change
@@ -421,7 +495,14 @@ function openPersonEditor(container, day, group, id) {
     editing = false;
     if (action === 'save') {
       let e = locSel.value ? { loc: locSel.value } : null;
-      if (isKid && e && dpSel.value) e.dp = dpSel.value;
+      if (isKid && e) {
+        const dropV = dropSel.value, pickV = pickSel.value;
+        if (dropV && dropV === pickV) e.dp = dropV;
+        else {
+          if (dropV) e.drop = dropV;
+          if (pickV) e.pick = pickV;
+        }
+      }
       if (scopeVal === 'week') {
         setLocalOverride(e);
         patchWeek({ overrides: { [day.key]: { [group]: { [id]: e } } } });
@@ -754,6 +835,18 @@ function weatherLine(dayIso) {
   return line;
 }
 
+// ---------- calendar row (family Google Calendar, read-only) ----------
+function calendarContent(day, dayIso) {
+  const events = CALENDAR[dayIso] || [];
+  if (!events.length) return [el('span', 'none', '—')];
+  return events.map((ev) => {
+    const chip = el('span', 'cal-chip');
+    chip.append(el('span', null, ev.title));
+    if (ev.time) chip.append(el('span', 'sub', ev.time));
+    return chip;
+  });
+}
+
 // ---------- render: board ----------
 // Row definitions: label rail + one cell builder per day.
 const ROWS = [
@@ -761,6 +854,7 @@ const ROWS = [
   ...KIDS.map((id) => ({ type: 'person', group: 'kids', id, build: (d) => kidContent(d, id) })),
   { type: 'group', label: 'Dinner',     build: mealContent },
   { type: 'group', label: 'Activities', build: eventsContent, tapEdit: openActivitiesEditor },
+  { type: 'group', label: 'Calendar',   build: calendarContent },
   { type: 'group', label: 'Chores',     build: tasksContent, cls: 'chores', holdEdit: openChoresEditor },
   { type: 'group', label: 'Notes',      build: dayNoteContent },
 ];
@@ -805,7 +899,7 @@ function renderGrid(board) {
       personColor(label, row.id);
       const nameRow = el('div', 'label-name');
       nameRow.append(el('span', 'dot'), el('span', null, FAMILY[row.id].short));
-      label.append(nameRow, el('div', 'label-role', FAMILY[row.id].role));
+      label.append(nameRow);
     } else {
       label.append(el('span', null, row.label));
     }
@@ -815,7 +909,7 @@ function renderGrid(board) {
     TEMPLATE.forEach((day, i) => {
       const dayIso = iso(dateOfDay(i));
       const cell = el('div', `cell${dayClass(dayIso, todayIso)}${row.cls ? ' ' + row.cls : ''}`);
-      cell.append(...row.build(day));
+      cell.append(...row.build(day, dayIso));
       if (row.type === 'person') {
         cell.classList.add('editable');
         cell.addEventListener('click', () => openPersonEditor(cell, day, row.group, row.id));
@@ -855,7 +949,7 @@ function renderStacked(board) {
     card.append(head);
 
     for (const row of ROWS) {
-      const content = row.build(day);
+      const content = row.build(day, dayIso);
       if (!content.length) continue;
       const lane = el('div', `lane${row.cls ? ' ' + row.cls : ''}`);
       if (row.type === 'person') {
@@ -889,11 +983,14 @@ async function refresh() {
   if (ws !== weekStart) {
     week = { meals: {}, tasks: {}, notes: '', dayNotes: {}, overrides: {} }; // week rolled over
     weatherFetched = 0;                                                       // refetch range
+    calendarFetched = 0;                                                      // refetch range
   }
   weekStart = ws;
   // Don't refetch the template mid-edit: open editors hold live references into
   // TEMPLATE, and replacing it would silently orphan their changes.
-  await Promise.all([fetchWeek(), editing ? null : fetchTemplate(), fetchWeather(), fetchPrayerTimes()]);
+  await Promise.all([
+    fetchWeek(), editing ? null : fetchTemplate(), fetchWeather(), fetchPrayerTimes(), fetchCalendar(),
+  ]);
   renderHeader();
   renderNotes();
   renderBoard();
