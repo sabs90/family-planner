@@ -11,17 +11,28 @@
   <header class="topbar">
     <div class="topbar-title">
       <h1>The Week</h1>
+      <nav class="week-nav" aria-label="Week navigation">
+        <button id="wk-prev" class="wk-btn" title="Previous week">‹</button>
+        <button id="wk-next" class="wk-btn" title="Next week">›</button>
+      </nav>
       <span id="current-weather" class="current-weather"></span>
     </div>
     <div id="prayer-strip" class="prayer-strip" title="Prayer times (Hanafi madhab, Sydney)"></div>
     <div class="topbar-clock">
-      <button id="edit-btn" class="theme-btn" title="Edit the board">✏️ Edit</button>
-      <a href="settings.html" class="theme-btn settings-link" title="Edit routine">⚙️</a>
+      <div class="menu-wrap">
+        <button id="menu-btn" class="theme-btn" title="Edit &amp; settings">⋯</button>
+        <div id="menu-dd" class="menu-dd hidden">
+          <button id="edit-btn" class="menu-item">✏️ Edit board</button>
+          <a href="settings.html" class="menu-item">⚙️ Routine settings</a>
+        </div>
+      </div>
       <button id="theme-btn" class="theme-btn" title="Switch theme"></button>
       <div id="today-label" class="today-label"></div>
       <div id="clock" class="clock"></div>
     </div>
   </header>
+
+  <div id="hourly-strip" class="hourly-strip" title="Today’s hourly forecast"></div>
 
   <div class="notes-strip" id="notes-strip" title="Tap to edit notes">
     <span class="notes-icon">📌</span>

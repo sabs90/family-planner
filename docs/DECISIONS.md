@@ -167,3 +167,19 @@ Newest at bottom. Append with today's date when decisions are made or changed.
 - **Google Calendar configured and verified live** against the real family calendar (not
   just a test feed) — the Calendar row now shows real events (e.g. "Finance Night",
   recurring weekly; "Raka's", timed; "Cancel chessable", all-day) correctly placed by date.
+
+## 2026-07-13 — Week-ahead navigation + rotating chores
+- **Week navigation** added to the topbar (`‹ ›` arrows next to the title): scroll to
+  next/other weeks to plan ahead (Thursday-night ritual) — notes, day notes, chore ticks
+  and this-week overrides all already keyed by week-start server-side, so they just work
+  on any viewed week. A date-range pill was tried first but cluttered the bar — removed
+  in favour of the arrows going accent-colored while off the current week (the day-header
+  dates say which week you're on). Kiosk safeguard: auto-returns to the current week
+  after 10 min without a nav tap. Range clamped to −1…+3 weeks.
+- **Rotating chores**: chores can carry `rotate: [pidOrNull, …]` — index = weeks since
+  `ROTATION_EPOCH` (public/rotation.js, `2026-07-13` = week A) mod length; a null slot
+  hides the chore that week. Rendered with 🔁 + the on-duty parent; both chore editors
+  (board + settings) grew rotation options phrased relative to the week being edited.
+- **Routine change**: meal plan moved Friday → Thursday night and now rotates
+  (Sab wk A ⇄ Raya wk B); Sunday gained **batch cook** (Sab, wk A) and **lunch cook**
+  (Raya, wk B). Applied to the live template via the API and to the seed template.

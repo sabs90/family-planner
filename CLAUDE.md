@@ -50,13 +50,13 @@ multi-calendar support if events live across more than one Google Calendar.
      `server/default-template.js`), edited in-app via `GET/PUT /api/template`.
      Routine changes need **no container rebuild**. Also carries small display prefs
      (`settings.prayerView`), set from the settings page.
-  3. Weekly dynamic state — `server/data/state.json` keyed by week-start (Sunday):
-     meals, chore ticks, notes, dayNotes, and this-week **overrides** (auto-expire at
+  3. Weekly dynamic state — `server/data/state.json` keyed by week-start (Monday):
+     chore ticks, notes, dayNotes, and this-week **overrides** (auto-expire at
      rollover; `"__reset__"` sentinel clears one).
   4. Calendar secret (`server/data/calendar-config.json`, gitignored, created manually —
      see README): `{ icsUrl }` for the family Google Calendar. Never sent to the client;
      only parsed event titles/times are, via `GET /api/calendar/:weekStart`.
-- Week starts **Sunday** (Sunday prep kicks off the week). Column order is Sun→Sat.
+- Week starts **Monday**. Column order is Mon→Sun (Sunday prep closes out the week).
 - Editors hold live references into the client's TEMPLATE — never refetch the template
   while `editing` is true.
 - Keep it vibe-code-friendly and simple: readable vanilla code, minimal deps (Express +

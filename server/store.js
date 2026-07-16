@@ -30,13 +30,35 @@ const state = loadJson(STATE_FILE, { weeks: {} });
 let template = loadJson(TEMPLATE_FILE, { week: DEFAULT_WEEK, activities: DEFAULT_ACTIVITIES });
 template.activities ??= DEFAULT_ACTIVITIES; // template.json saved before the catalog existed
 template.settings ??= { prayerView: 'countdown' }; // template.json saved before settings existed
+template.settings.showActivities ??= false; // template.json saved before the toggle existed
+template.settings.layout ??= 'standard'; // 'standard' (header top) | 'flipped' (board top)
+
+// One-time migration: the board switched from Sunday-start to Monday-start weeks.
+// Rotate a Sunday-first template into Monday-first order…
+if (template.week?.[0]?.key === 'sunday') {
+  template.week.push(template.week.shift());
+  saveJson(TEMPLATE_FILE, template);
+}
+// …and re-key Sunday-keyed week state to its Monday (one day later). Day names
+// inside each record are unchanged, so ticks/notes/overrides carry over as-is.
+for (const key of Object.keys(state.weeks)) {
+  const [y, m, d] = key.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  if (date.getDay() !== 0) continue;
+  date.setDate(date.getDate() + 1);
+  const pad = (n) => String(n).padStart(2, '0');
+  const monKey = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  state.weeks[monKey] ??= state.weeks[key];
+  delete state.weeks[key];
+  saveJson(STATE_FILE, state);
+}
 
 // ---------- template (the standing routine) ----------
 export function getTemplate() {
   return template;
 }
 
-const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
 export function putTemplate(next) {
   if (!next || !Array.isArray(next.week) || next.week.length !== 7) {
@@ -56,7 +78,11 @@ export function putTemplate(next) {
     : template.activities;
   // Display settings: same preserve-if-omitted rule as activities.
   const settings = next.settings && typeof next.settings === 'object'
-    ? { prayerView: next.settings.prayerView === 'all' ? 'all' : 'countdown' }
+    ? {
+        prayerView: next.settings.prayerView === 'all' ? 'all' : 'countdown',
+        showActivities: Boolean(next.settings.showActivities),
+        layout: next.settings.layout === 'flipped' ? 'flipped' : 'standard',
+      }
     : template.settings;
   template = { week: next.week, activities, settings };
   saveJson(TEMPLATE_FILE, template);

@@ -80,6 +80,31 @@ body {
 
 .current-weather { font-size: 1.05rem; color: var(--text-2); font-weight: 500; }
 
+/* Week navigation: scroll ahead to plan next week; the pill taps back home */
+.week-nav { display: flex; align-items: center; gap: 4px; align-self: center; }
+
+.wk-btn {
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+}
+.wk-btn:hover { color: var(--text); }
+
+/* Scrolled off the current week → arrows light up as the cue */
+.week-nav.other-week .wk-btn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .topbar-clock { display: flex; align-items: center; gap: 12px; flex: none; }
 
 .clock {
@@ -105,7 +130,40 @@ body {
 }
 .theme-btn:hover { color: var(--text); }
 
-.settings-link { text-decoration: none; padding: 4px 9px; }
+/* Topbar ⋯ menu: edit + settings in one dropdown */
+.menu-wrap { position: relative; align-self: center; }
+
+.menu-dd {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 175px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.menu-dd.hidden { display: none; }
+
+.menu-item {
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.menu-item:hover { background: var(--surface-2); }
 
 .theme-btn.active {
   background: var(--accent);
@@ -170,6 +228,48 @@ body.edit-mode .notes-strip {
   color: var(--accent);
 }
 
+/* ---------- Flipped layout: board on top, header + weather at the bottom ---------- */
+body.layout-flipped .board       { order: 1; }
+body.layout-flipped .notes-strip { order: 2; }
+body.layout-flipped .hourly-strip { order: 3; }
+body.layout-flipped .topbar      { order: 4; }
+/* Topbar sits at the bottom now → its dropdown must open upward */
+body.layout-flipped .menu-dd { top: auto; bottom: calc(100% + 6px); }
+
+/* ---------- Today's hourly forecast strip ---------- */
+.hourly-strip {
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px 8px;
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+.hourly-strip:empty { display: none; }
+
+.hr-tile {
+  flex: 1 1 0;
+  min-width: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 2px;
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.hr-tile.past { opacity: 0.4; }
+.hr-tile.now { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+.hr-time { font-size: 0.68rem; font-weight: 700; color: var(--text-3); }
+.hr-tile.now .hr-time { color: var(--accent); }
+.hr-icon { font-size: 0.95rem; line-height: 1.25; }
+.hr-temp { font-size: 0.8rem; font-weight: 700; }
+.hr-rain { font-size: 0.66rem; font-weight: 600; color: var(--text-2); min-height: 0.9em; }
+.hr-rain.quiet { color: var(--text-3); opacity: 0.55; }
+
 /* ---------- Notes strip ---------- */
 .notes-strip {
   display: flex;
@@ -206,8 +306,8 @@ body.edit-mode .notes-strip {
   min-height: 100%;
   display: grid;
   grid-template-columns: 96px repeat(7, 1fr);
-  /* header, 4 people, dinner, activities; chores fills the rest; notes at bottom */
-  grid-template-rows: auto auto auto auto auto auto auto 1fr auto;
+  /* grid-template-rows is set inline by renderGrid — row count varies
+     (Activities row is toggleable); chores gets 1fr, everything else auto */
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -375,62 +475,6 @@ body.edit-mode .notes-strip {
   border-radius: 50%;
   background: var(--pc);
 }
-
-/* Dinner */
-.meal-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 24px;
-  cursor: pointer;
-  border-radius: 8px;
-  max-width: 100%;
-}
-
-.meal-dish { font-size: 0.88rem; font-weight: 600; }
-.meal-dish.empty { color: var(--text-3); font-weight: 500; font-style: italic; }
-.meal-fixed { cursor: default; }
-
-.cook-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--pc);
-}
-.cook-chip::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--pc);
-}
-
-.meal-editor { display: flex; flex-direction: column; gap: 6px; width: 100%; }
-.meal-editor input, .meal-editor select {
-  font: inherit;
-  font-size: 0.85rem;
-  color: var(--text);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 5px 8px;
-  width: 100%;
-}
-.meal-editor .editor-actions { display: flex; gap: 6px; }
-.meal-editor button {
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 700;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-2);
-  padding: 4px 10px;
-  cursor: pointer;
-}
-.meal-editor button.save { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 /* Activities chips */
 .evening-chip {
@@ -668,6 +712,8 @@ body.edit-mode .notes-strip {
 @media (max-width: 900px) {
   body { padding: 10px; }
   .board { overflow-y: auto; }
+  .topbar { flex-wrap: wrap; align-items: center; }
+  .topbar-title { flex-wrap: wrap; }
   .topbar h1 { font-size: 1.25rem; }
   .clock { font-size: 1.25rem; }
 }

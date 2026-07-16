@@ -1,0 +1,10 @@
+node_modules/
+.git/
+.claude/
+docs/
+server/data/
+.DS_Store
+**/.DS_Store
+*.md
+docker-compose.yml
+Dockerfile

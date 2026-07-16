@@ -12,20 +12,6 @@ export const DEFAULT_ACTIVITIES = [
 
 export const DEFAULT_WEEK = [
   {
-    key: 'sunday', label: 'Sunday',
-    parents: { sabeeh: null, raya: null },
-    kids: { illy: { loc: 'home' }, ismail: { loc: 'home' } },
-    events: [],
-    tasks: [
-      { slug: 'meal-prep',    label: 'Weekly meal prep',      when: 'Arvo' },
-      { slug: 'groceries',    label: 'Groceries' },
-      { slug: 'kids-clothes', label: 'Arrange kids’ clothes', when: 'Evening' },
-      { slug: 'pack-bags',    label: 'Pack kids’ bags',       when: 'Evening' },
-      { slug: 'iron-shirts',  label: 'Iron shirts',           personId: 'sabeeh' },
-      { slug: 'prep-outfits', label: 'Prep work outfits',     personId: 'raya' },
-    ],
-  },
-  {
     key: 'monday', label: 'Monday',
     parents: { sabeeh: { loc: 'city' }, raya: { loc: 'wfh' } },
     kids: {
@@ -54,7 +40,6 @@ export const DEFAULT_WEEK = [
     },
     events: [{ label: 'Family dinner @ Mascot', icon: '🍽️' }],
     tasks: [],
-    mealFixed: { dish: 'Dinner at grandparents’' },
   },
   {
     key: 'thursday', label: 'Thursday',
@@ -67,6 +52,8 @@ export const DEFAULT_WEEK = [
     tasks: [
       { slug: 'bins',   label: 'Bins' },
       { slug: 'fridge', label: 'Fridge' },
+      // rotate: [week A, week B] — anchored to ROTATION_EPOCH in public/rotation.js
+      { slug: 'meal-plan', label: 'Meal plan', when: 'Night', rotate: ['sabeeh', 'raya'] },
     ],
   },
   {
@@ -82,7 +69,6 @@ export const DEFAULT_WEEK = [
       { slug: 'tidy',      label: 'Tidy' },
       { slug: 'toilets',   label: 'Toilets' },
       { slug: 'vacuum',    label: 'Vacuum' },
-      { slug: 'meal-plan', label: 'Meal plan' },
     ],
   },
   {
@@ -99,6 +85,23 @@ export const DEFAULT_WEEK = [
     tasks: [
       { slug: 'laundry', label: 'Laundry' },
       { slug: 'study',   label: 'Study' },
+    ],
+  },
+  {
+    key: 'sunday', label: 'Sunday',
+    parents: { sabeeh: null, raya: null },
+    kids: { illy: { loc: 'home' }, ismail: { loc: 'home' } },
+    events: [],
+    tasks: [
+      { slug: 'meal-prep',    label: 'Weekly meal prep',      when: 'Arvo' },
+      // Alternating fortnight pair: week A Sab batch cooks, week B Raya lunch cooks.
+      { slug: 'batch-cook',   label: 'Batch cook', rotate: ['sabeeh', null] },
+      { slug: 'lunch-cook',   label: 'Lunch cook', rotate: [null, 'raya'] },
+      { slug: 'groceries',    label: 'Groceries' },
+      { slug: 'kids-clothes', label: 'Arrange kids’ clothes', when: 'Evening' },
+      { slug: 'pack-bags',    label: 'Pack kids’ bags',       when: 'Evening' },
+      { slug: 'iron-shirts',  label: 'Iron shirts',           personId: 'sabeeh' },
+      { slug: 'prep-outfits', label: 'Prep work outfits',     personId: 'raya' },
     ],
   },
 ];

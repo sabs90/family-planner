@@ -55,7 +55,7 @@ export function isCalendarConfigured() {
   return Boolean(loadConfig().icsUrl);
 }
 
-// Returns this week's events (Sun–Sat), keyed by date, refreshing the cache
+// Returns this week's events (Mon–Sun), keyed by date, refreshing the cache
 // if it's gone stale. Fails soft: a fetch error just serves the last good
 // cache (or empty) rather than breaking the board.
 export async function getWeekEvents(weekStartIso) {

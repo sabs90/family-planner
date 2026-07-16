@@ -1,4 +1,5 @@
 import { FAMILY, PARENTS, KIDS, LOCATIONS, PARENT_LOCS, KID_LOCS } from './config.js';
+import { taskAssignee, rotationOptions, decodeRotate } from './rotation.js';
 
 const POLL_MS = 20_000;   // dynamic-state poll
 const TICK_MS = 30_000;   // clock / today / theme recompute
@@ -19,13 +20,24 @@ const PRAYER_SCHOOL = 1;
 const PRAYER_ORDER = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
 const PRAYER_NAMES = { fajr: 'Fajr', sunrise: 'Sunrise', dhuhr: 'Dhuhr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha' };
 
+// Week navigation: how far the viewed week is from the real current week.
+// +1 = next week (Thursday-night planning). The wall kiosk drifts back to the
+// current week after WEEK_VIEW_RESET_MS without a nav tap.
+const WEEK_OFFSET_MIN = -1;
+const WEEK_OFFSET_MAX = 3;
+const WEEK_VIEW_RESET_MS = 10 * 60 * 1000;
+
 // ---------- state ----------
-let weekStart = null;       // 'YYYY-MM-DD' of this week's Sunday
+let weekOffset = 0;         // 0 = current week; ±n weeks being viewed
+let weekOffsetTouched = 0;  // last nav interaction, for the kiosk auto-return
+let weekStart = null;       // 'YYYY-MM-DD' of the *viewed* week's Monday
 let TEMPLATE = [];          // the standing routine, from GET /api/template
 let ACTIVITIES = [];        // reusable activity catalog (grows via "add new")
 let PRAYER_VIEW = 'countdown'; // 'countdown' | 'all' — from template.settings, set on settings page
+let SHOW_ACTIVITIES = false;   // Activities row toggle — from template.settings
 let week = { meals: {}, tasks: {}, notes: '', dayNotes: {}, overrides: {} };
 let weather = {};           // dateIso → { icon, min, max, rain, hum }
+let hourly = null;          // raw Open-Meteo hourly arrays (whole week; filtered to today at render)
 let weatherFetched = 0;
 let currentWeather = null;  // { icon, temp } for the header
 let prayerTimes = null;         // { fajr, dhuhr, asr, maghrib, isha } Date objects, today
@@ -58,8 +70,13 @@ const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate(
 
 function currentWeekStart() {
   const d = new Date();
-  d.setDate(d.getDate() - d.getDay()); // back to Sunday
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back to Monday
   return iso(d);
+}
+
+function viewedWeekStart() {
+  const [y, m, d] = currentWeekStart().split('-').map(Number);
+  return iso(new Date(y, m - 1, d + weekOffset * 7));
 }
 
 function dateOfDay(i) {
@@ -99,24 +116,28 @@ function cycleTheme() {
 
 // ---------- server ----------
 async function fetchWeek() {
-  const res = await fetch(`/api/week/${weekStart}`);
+  const res = await fetch(`api/week/${weekStart}`);
   if (res.ok) week = await res.json();
 }
 
 async function fetchTemplate() {
-  const res = await fetch('/api/template');
+  const res = await fetch('api/template');
   if (res.ok) {
     const t = await res.json();
     TEMPLATE = t.week;
     ACTIVITIES = t.activities || [];
     PRAYER_VIEW = t.settings?.prayerView === 'all' ? 'all' : 'countdown';
+    SHOW_ACTIVITIES = Boolean(t.settings?.showActivities);
+    // Layout: 'flipped' puts the board on top and header + hourly strip at the
+    // bottom — pure CSS order swap, so it's instantly reversible from settings.
+    document.body.classList.toggle('layout-flipped', t.settings?.layout === 'flipped');
   }
 }
 
 async function fetchCalendar() {
   if (Date.now() - calendarFetched < CALENDAR_TTL) return;
   try {
-    const res = await fetchWithTimeout(`/api/calendar/${weekStart}`);
+    const res = await fetchWithTimeout(`api/calendar/${weekStart}`);
     if (!res.ok) return;
     const { events } = await res.json();
     CALENDAR = {};
@@ -127,7 +148,7 @@ async function fetchCalendar() {
 
 function patchWeek(patch) {
   // Optimistic: state already updated locally; fire-and-forget, poll reconciles.
-  fetch(`/api/week/${weekStart}`, {
+  fetch(`api/week/${weekStart}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
@@ -135,7 +156,7 @@ function patchWeek(patch) {
 }
 
 function putTemplate() {
-  fetch('/api/template', {
+  fetch('api/template', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ week: TEMPLATE, activities: ACTIVITIES }),
@@ -170,11 +191,13 @@ async function fetchWeather() {
     const url = `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}` +
       `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,relative_humidity_2m_mean` +
+      `&hourly=temperature_2m,weather_code,precipitation_probability` +
       `&current=temperature_2m,weather_code` +
       `&timezone=Australia%2FSydney&start_date=${weekStart}&end_date=${iso(dateOfDay(6))}`;
     const res = await fetchWithTimeout(url);
     if (!res.ok) return;
-    const { daily, current } = await res.json();
+    const { daily, hourly: hourlyData, current } = await res.json();
+    hourly = hourlyData || null;
     weather = {};
     daily.time.forEach((d, i) => {
       weather[d] = {
@@ -286,6 +309,57 @@ function renderHeader() {
     currentWeather ? `${currentWeather.icon} ${currentWeather.temp}°` : '';
 
   renderPrayer();
+  renderHourly();
+}
+
+// ---------- render: week navigation ----------
+function renderWeekNav() {
+  // Off the current week, the arrows go accent-colored — the "you've scrolled"
+  // cue now that there's no date-range pill.
+  const nav = document.querySelector('.week-nav');
+  if (nav) nav.classList.toggle('other-week', weekOffset !== 0);
+}
+
+function setWeekOffset(n) {
+  if (editing) return; // open editors hold references into the viewed week
+  weekOffsetTouched = Date.now();
+  const next = Math.max(WEEK_OFFSET_MIN, Math.min(WEEK_OFFSET_MAX, n));
+  if (next === weekOffset) return;
+  weekOffset = next;
+  refresh();
+}
+
+// ---------- render: today's hourly forecast strip ----------
+const HOURLY_FROM = 6;   // show 6am…
+const HOURLY_TO = 21;    // …to 9pm — the hours that matter for planning the day
+
+function fmtHour(h) {
+  return `${h % 12 || 12}${h < 12 ? 'am' : 'pm'}`;
+}
+
+function renderHourly() {
+  const node = document.getElementById('hourly-strip');
+  if (!node) return;
+  node.textContent = '';
+  if (!hourly) return; // no data yet (offline / still loading) → strip collapses
+  const todayIso = iso(new Date());
+  const nowH = new Date().getHours();
+  hourly.time.forEach((t, i) => {
+    const [dayIso, hm] = t.split('T');
+    if (dayIso !== todayIso) return;
+    const h = Number(hm.slice(0, 2));
+    if (h < HOURLY_FROM || h > HOURLY_TO) return;
+    const tile = el('div', `hr-tile${h === nowH ? ' now' : h < nowH ? ' past' : ''}`);
+    tile.append(
+      el('span', 'hr-time', fmtHour(h)),
+      el('span', 'hr-icon', weatherIcon(hourly.weather_code[i])),
+      el('span', 'hr-temp', `${Math.round(hourly.temperature_2m[i])}°`),
+    );
+    const rainPct = hourly.precipitation_probability?.[i];
+    tile.append(el('span', `hr-rain${rainPct >= 20 ? '' : ' quiet'}`,
+      rainPct != null ? `☔ ${rainPct}%` : ''));
+    node.append(tile);
+  });
 }
 
 // ---------- render: prayer strip ----------
@@ -521,71 +595,6 @@ function openPersonEditor(container, day, group, id) {
   cancel.addEventListener('click', () => close('cancel'));
 }
 
-// ---------- dinner ----------
-function mealContent(day) {
-  if (day.mealFixed) {
-    const row = el('div', 'meal-row meal-fixed');
-    row.append(el('span', null, '🍽️'), el('span', 'meal-dish', day.mealFixed.dish));
-    return [row];
-  }
-  const meal = week.meals[day.key] || {};
-  const row = el('div', 'meal-row');
-  row.append(el('span', null, '🍽️'));
-  if (meal.dish) {
-    row.append(el('span', 'meal-dish', meal.dish));
-    if (meal.cookId && FAMILY[meal.cookId]) {
-      const cook = personColor(el('span', 'cook-chip'), meal.cookId);
-      cook.append(el('span', null, FAMILY[meal.cookId].short));
-      row.append(cook);
-    }
-  } else {
-    row.append(el('span', 'meal-dish empty', 'add dinner'));
-  }
-  row.addEventListener('click', () => openMealEditor(row, day));
-  return [row];
-}
-
-function openMealEditor(row, day) {
-  if (editing) return;
-  editing = true;
-  const meal = week.meals[day.key] || {};
-
-  const form = el('div', 'meal-editor');
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.placeholder = 'What’s for dinner?';
-  input.value = meal.dish || '';
-
-  const select = document.createElement('select');
-  select.append(new Option('Who’s cooking?', ''));
-  for (const id of PARENTS) select.append(new Option(FAMILY[id].name, id));
-  select.value = meal.cookId || '';
-
-  const actions = el('div', 'editor-actions');
-  const save = el('button', 'save', 'Save');
-  const cancel = el('button', null, 'Cancel');
-  actions.append(save, cancel);
-  form.append(input, select, actions);
-  row.replaceWith(form);
-  input.focus();
-
-  const close = (doSave) => {
-    editing = false;
-    if (doSave) {
-      const updated = { dish: input.value.trim(), cookId: select.value };
-      week.meals[day.key] = updated;
-      patchWeek({ meals: { [day.key]: updated } });
-    }
-    renderBoard();
-  };
-  save.addEventListener('click', () => close(true));
-  cancel.addEventListener('click', () => close(false));
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') close(true);
-    if (e.key === 'Escape') close(false);
-  });
-}
-
 // ---------- activities / chores / day notes ----------
 function eventChip(ev) {
   const chip = personColor(el('span', 'evening-chip'), ev.personId);
@@ -710,9 +719,13 @@ function openChoresEditor(container, day) {
     for (const task of day.tasks) {
       const row = el('div', 'le-row');
       const label = el('span', 'task-label', task.label);
-      const meta = personColor(el('span', 'task-meta'), task.personId);
-      meta.textContent = task.personId && FAMILY[task.personId]
-        ? FAMILY[task.personId].short : (task.when || '');
+      const { pid } = taskAssignee(task, weekStart);
+      const meta = personColor(el('span', 'task-meta'), pid);
+      // Rotating chores list every week here (incl. off-weeks) so they can be
+      // removed; the meta shows the whole cycle, e.g. "🔁 Sab/Raya".
+      meta.textContent = Array.isArray(task.rotate) && task.rotate.length
+        ? '🔁 ' + task.rotate.map((p) => (p && FAMILY[p] ? FAMILY[p].short : '—')).join('/')
+        : (task.personId && FAMILY[task.personId] ? FAMILY[task.personId].short : (task.when || ''));
       const rm = el('button', 'rm-btn', '✕');
       rm.addEventListener('click', () => {
         day.tasks.splice(day.tasks.indexOf(task), 1);
@@ -732,6 +745,7 @@ function openChoresEditor(container, day) {
   const who = document.createElement('select');
   who.append(new Option('Anyone', ''));
   for (const pid of PARENTS) who.append(new Option(FAMILY[pid].short, pid));
+  for (const opt of rotationOptions(weekStart)) who.append(new Option(opt.label, opt.value));
 
   const addRow = el('div', 'le-add');
   addRow.append(input, who);
@@ -743,7 +757,9 @@ function openChoresEditor(container, day) {
     const label = input.value.trim();
     if (!label) return;
     const task = { slug: taskSlug(day, label), label };
-    if (who.value) task.personId = who.value;
+    const rot = decodeRotate(who.value);
+    if (rot) task.rotate = rot;
+    else if (who.value) task.personId = who.value;
     day.tasks.push(task);
     putTemplate();
     rebuild();
@@ -763,14 +779,17 @@ function openChoresEditor(container, day) {
 }
 
 function tasksContent(day) {
-  return day.tasks.map((task) => {
+  const rows = [];
+  for (const task of day.tasks) {
+    const { pid, rotates, hidden } = taskAssignee(task, weekStart);
+    if (hidden) continue; // rotating chore on its off-week
     const id = `${day.key}::${task.slug}`;
     const done = Boolean(week.tasks[id]);
     const row = el('div', `task-row${done ? ' done' : ''}`);
     row.append(el('span', 'task-check', '✓'), el('span', 'task-label', task.label));
-    const meta = personColor(el('span', 'task-meta'), task.personId);
-    meta.textContent = task.personId && FAMILY[task.personId]
-      ? FAMILY[task.personId].short : (task.when || '');
+    const meta = personColor(el('span', 'task-meta'), pid);
+    const who = pid && FAMILY[pid] ? `${rotates ? '🔁 ' : ''}${FAMILY[pid].short}` : '';
+    meta.textContent = [who, task.when || ''].filter(Boolean).join(' · ');
     row.append(meta);
     row.addEventListener('click', () => {
       if (editing) return;  // a long-press just opened the chores editor
@@ -780,8 +799,9 @@ function tasksContent(day) {
       patchWeek({ tasks: { [id]: next } });
       renderBoard();
     });
-    return row;
-  });
+    rows.push(row);
+  }
+  return rows;
 }
 
 function dayNoteContent(day) {
@@ -852,12 +872,17 @@ function calendarContent(day, dayIso) {
 const ROWS = [
   ...PARENTS.map((id) => ({ type: 'person', group: 'parents', id, build: (d) => parentContent(d, id) })),
   ...KIDS.map((id) => ({ type: 'person', group: 'kids', id, build: (d) => kidContent(d, id) })),
-  { type: 'group', label: 'Dinner',     build: mealContent },
-  { type: 'group', label: 'Activities', build: eventsContent, tapEdit: openActivitiesEditor },
+  { type: 'group', label: 'Activities', build: eventsContent, tapEdit: openActivitiesEditor, id: 'activities' },
   { type: 'group', label: 'Calendar',   build: calendarContent },
   { type: 'group', label: 'Chores',     build: tasksContent, cls: 'chores', holdEdit: openChoresEditor },
   { type: 'group', label: 'Notes',      build: dayNoteContent },
 ];
+
+// Activities is toggleable from the settings page (hidden by default — the
+// plan is to fold activities into the family calendar instead).
+function boardRows() {
+  return ROWS.filter((row) => row.id !== 'activities' || SHOW_ACTIVITIES);
+}
 
 function dayClass(dayIso, todayIso) {
   if (dayIso === todayIso) return ' today';
@@ -875,7 +900,11 @@ function renderBoard() {
 
 function renderGrid(board) {
   const todayIso = iso(new Date());
+  const rows = boardRows();
   const grid = el('div', 'grid');
+  // Header + rows, all auto-height except chores, which soaks up spare space.
+  grid.style.gridTemplateRows =
+    ['auto', ...rows.map((r) => (r.cls === 'chores' ? '1fr' : 'auto'))].join(' ');
 
   // Header row: corner + day headers with date + weather
   grid.append(el('div', 'cell head first'));
@@ -892,7 +921,7 @@ function renderGrid(board) {
     grid.append(cell);
   });
 
-  for (const row of ROWS) {
+  for (const row of rows) {
     // Label rail
     const label = el('div', `cell first label${row.type === 'group' ? ' group' : ''}${row.cls ? ' ' + row.cls : ''}`);
     if (row.type === 'person') {
@@ -936,7 +965,9 @@ function renderStacked(board) {
   TEMPLATE.forEach((day, i) => {
     const date = dateOfDay(i);
     const dayIso = iso(date);
-    if (dayIso < todayIso) return; // phone: hide past days, focus on now
+    // Phone: hide past days to focus on now — but only on the current week,
+    // otherwise a scrolled-back week would render empty.
+    if (weekOffset === 0 && dayIso < todayIso) return;
 
     const card = el('section', `day-card${dayClass(dayIso, todayIso)}`);
     const head = el('div', 'day-head');
@@ -948,7 +979,7 @@ function renderStacked(board) {
     head.append(el('span', 'day-date', String(date.getDate())));
     card.append(head);
 
-    for (const row of ROWS) {
+    for (const row of boardRows()) {
       const content = row.build(day, dayIso);
       if (!content.length) continue;
       const lane = el('div', `lane${row.cls ? ' ' + row.cls : ''}`);
@@ -979,18 +1010,24 @@ function renderStacked(board) {
 
 // ---------- lifecycle ----------
 async function refresh() {
-  const ws = currentWeekStart();
-  if (ws !== weekStart) {
-    week = { meals: {}, tasks: {}, notes: '', dayNotes: {}, overrides: {} }; // week rolled over
-    weatherFetched = 0;                                                       // refetch range
-    calendarFetched = 0;                                                      // refetch range
+  const ws = viewedWeekStart();
+  if (ws !== weekStart) { // navigated, or the week rolled over
+    weekStart = ws;
+    week = { meals: {}, tasks: {}, notes: '', dayNotes: {}, overrides: {} };
+    weather = {};        // clear + refetch range — stale data is another week's
+    weatherFetched = 0;
+    CALENDAR = {};
+    calendarFetched = 0;
+    renderWeekNav();
+    renderNotes();
+    renderBoard(); // show the new week immediately; fetches below fill it in
   }
-  weekStart = ws;
   // Don't refetch the template mid-edit: open editors hold live references into
   // TEMPLATE, and replacing it would silently orphan their changes.
   await Promise.all([
     fetchWeek(), editing ? null : fetchTemplate(), fetchWeather(), fetchPrayerTimes(), fetchCalendar(),
   ]);
+  renderWeekNav();
   renderHeader();
   renderNotes();
   renderBoard();
@@ -999,22 +1036,45 @@ async function refresh() {
 function tick() {
   applyTheme();
   renderHeader();
+  // Kiosk: left on another week with nobody navigating → drift back home.
+  if (weekOffset !== 0 && Date.now() - weekOffsetTouched > WEEK_VIEW_RESET_MS && !editing) {
+    weekOffset = 0;
+    refresh();
+  }
   // Advance today-highlight (and week) at midnight without waiting for a poll.
-  if (currentWeekStart() !== weekStart) refresh();
+  else if (viewedWeekStart() !== weekStart) refresh();
   else if (!editing) renderBoard();
+}
+
+// ---------- topbar menu (edit + settings live in one ⋯ dropdown) ----------
+const menuBtn = document.getElementById('menu-btn');
+const menuDd = document.getElementById('menu-dd');
+
+function closeMenu() {
+  menuDd.classList.add('hidden');
 }
 
 function toggleEditMode() {
   editMode = !editMode;
   document.body.classList.toggle('edit-mode', editMode);
-  const btn = document.getElementById('edit-btn');
-  btn.textContent = editMode ? '✓ Done' : '✏️ Edit';
-  btn.classList.toggle('active', editMode);
+  // While editing, the ⋯ button becomes a one-tap "done" — no menu detour.
+  menuBtn.textContent = editMode ? '✓ Done' : '⋯';
+  menuBtn.classList.toggle('active', editMode);
+  closeMenu();
   if (!editing) renderBoard();
 }
 
+menuBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (editMode) toggleEditMode();
+  else menuDd.classList.toggle('hidden');
+});
+document.addEventListener('click', closeMenu);
+
 applyTheme();
 weekStart = currentWeekStart();
+document.getElementById('wk-prev').addEventListener('click', () => setWeekOffset(weekOffset - 1));
+document.getElementById('wk-next').addEventListener('click', () => setWeekOffset(weekOffset + 1));
 document.getElementById('notes-strip').addEventListener('click', openNotesEditor);
 document.getElementById('theme-btn').addEventListener('click', cycleTheme);
 document.getElementById('edit-btn').addEventListener('click', toggleEditMode);

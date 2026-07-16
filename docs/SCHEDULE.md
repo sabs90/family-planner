@@ -33,6 +33,13 @@ point, `template.json` as the runtime truth.
 | `grandparents` | Mascot | | childcare at grandparents' (displayed as just "Mascot"); colored chip (green) |
 | `home` | Home | | kid at home with parent(s) |
 
+## Rotating chores (week A / week B)
+Some chores alternate on a fortnight cycle (`rotate` field on the chore; anchored to
+`ROTATION_EPOCH` in `public/rotation.js` — the week of **Mon 2026-07-13 is week A**):
+- **Thu night — meal plan:** Sabeeh week A ⇄ Raya week B.
+- **Sun — batch cook:** Sabeeh, week A only.
+- **Sun — lunch cook:** Raya, week B only.
+
 ## Day by day
 
 ### Sunday — prep day (no work)
@@ -40,6 +47,8 @@ point, `template.json` as the runtime truth.
 - **Raya:** prep work outfits.
 - **Shared prep tasks (checkable, reset weekly):**
   - Afternoon — **weekly meal prep**
+  - **Batch cook** — week A only, Sabeeh 🔁
+  - **Lunch cook** — week B only, Raya 🔁
   - **Groceries**
   - Evening — **arrange kids' clothes for the week**
   - Evening — **pack kids' bags**
@@ -69,14 +78,15 @@ point, `template.json` as the runtime truth.
 - Illy: **Grandparents' (Mascot)** — Sabeeh D/P
 - Ismail: **Daycare** — Raya D/P
 - Evening: **Sabeeh — futsal**
-- Chores: **bins, fridge**
+- Chores: **bins, fridge, meal plan (night — 🔁 Sabeeh week A ⇄ Raya week B)**
+  — Thursday night is when the week ahead gets planned on the board.
 
 ### Friday
 - Sabeeh: **WFH** · Raya: **WFH**
 - Illy: **Daycare** — Sabeeh D/P
 - Ismail: **Home** (both parents WFH)
 - Evening: —
-- Chores: **laundry, tidy, toilets, vacuum, meal plan**
+- Chores: **laundry, tidy, toilets, vacuum** (meal plan moved to Thursday night)
 
 ### Saturday
 - No work.

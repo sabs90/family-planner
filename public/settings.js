@@ -1,6 +1,7 @@
 // Routine settings: edit the standing weekly template (GET/PUT /api/template).
 // One-off "this week" changes are made on the board itself, not here.
 import { FAMILY, PARENTS, KIDS, LOCATIONS, PARENT_LOCS, KID_LOCS } from './config.js';
+import { rotationOptions, encodeRotate, decodeRotate } from './rotation.js';
 
 let week = null; // working copy of the template
 let settings = { prayerView: 'countdown' }; // display prefs, saved immediately on change
@@ -14,6 +15,15 @@ function el(tag, className, text) {
 
 const slugify = (label) =>
   label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'task';
+
+// Monday of the real current week — anchors the "this wk" wording in the
+// rotating-chore options.
+function currentWeekStartIso() {
+  const d = new Date();
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 // ---------- person editors (select + optional custom activity) ----------
 function personRow(day, group, id) {
@@ -131,8 +141,19 @@ function taskRow(day, task) {
   const who = document.createElement('select');
   who.append(new Option('Anyone', ''));
   for (const pid of PARENTS) who.append(new Option(FAMILY[pid].short, pid));
-  who.value = task.personId || '';
-  who.addEventListener('change', () => { task.personId = who.value || undefined; });
+  for (const opt of rotationOptions(currentWeekStartIso())) who.append(new Option(opt.label, opt.value));
+  who.value = Array.isArray(task.rotate) && task.rotate.length
+    ? encodeRotate(task.rotate) : (task.personId || '');
+  who.addEventListener('change', () => {
+    const rot = decodeRotate(who.value);
+    if (rot) {
+      task.rotate = rot;
+      delete task.personId;
+    } else {
+      delete task.rotate;
+      task.personId = who.value || undefined;
+    }
+  });
 
   const when = document.createElement('input');
   when.type = 'text';
@@ -167,19 +188,6 @@ function renderDay(day) {
   for (const id of PARENTS) people.append(personRow(day, 'parents', id));
   for (const id of KIDS) people.append(personRow(day, 'kids', id));
   card.append(people);
-
-  const meals = el('div', 'set-block');
-  meals.append(el('div', 'set-block-title', 'Fixed dinner (blank = plan weekly)'));
-  const fixed = document.createElement('input');
-  fixed.type = 'text';
-  fixed.placeholder = 'e.g. Dinner at grandparents’';
-  fixed.value = day.mealFixed?.dish || '';
-  fixed.addEventListener('input', () => {
-    if (fixed.value.trim()) day.mealFixed = { dish: fixed.value.trim() };
-    else delete day.mealFixed;
-  });
-  meals.append(fixed);
-  card.append(meals);
 
   const events = el('div', 'set-block');
   events.append(el('div', 'set-block-title', 'Activities'));
@@ -224,7 +232,7 @@ function cleanup() {
 }
 
 async function putTemplate(body) {
-  return fetch('/api/template', {
+  return fetch('api/template', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -249,7 +257,7 @@ async function init() {
     : localStorage.getItem('themeMode') === 'light' ? 'light'
     : (new Date().getHours() >= 7 && new Date().getHours() < 19 ? 'light' : 'dark');
 
-  const res = await fetch('/api/template');
+  const res = await fetch('api/template');
   const t = await res.json();
   week = t.week;
   settings = t.settings || { prayerView: 'countdown' };
@@ -258,6 +266,20 @@ async function init() {
   prayerViewSelect.value = settings.prayerView;
   prayerViewSelect.addEventListener('change', () => {
     settings = { ...settings, prayerView: prayerViewSelect.value };
+    putTemplate({ week, settings });
+  });
+
+  const activitiesSelect = document.getElementById('activities-select');
+  activitiesSelect.value = settings.showActivities ? 'show' : 'hide';
+  activitiesSelect.addEventListener('change', () => {
+    settings = { ...settings, showActivities: activitiesSelect.value === 'show' };
+    putTemplate({ week, settings });
+  });
+
+  const layoutSelect = document.getElementById('layout-select');
+  layoutSelect.value = settings.layout === 'flipped' ? 'flipped' : 'standard';
+  layoutSelect.addEventListener('change', () => {
+    settings = { ...settings, layout: layoutSelect.value };
     putTemplate({ week, settings });
   });
 
